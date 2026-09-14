@@ -1,0 +1,328 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap");
+
+.cp-admin-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 256px;
+  height: 100vh;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border-right: 1px solid rgba(196, 197, 213, 0.3);
+  color: #131b2e;
+  font-family: "Geist", sans-serif;
+  box-sizing: border-box;
+}
+
+.cp-admin-sidebar *,
+.cp-admin-sidebar *::before,
+.cp-admin-sidebar *::after {
+  box-sizing: border-box;
+}
+
+.cp-admin-sidebar-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.cp-admin-sidebar-main::-webkit-scrollbar {
+  display: none;
+}
+
+.cp-admin-brand {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(196, 197, 213, 0.2);
+  flex: 0 0 64px;
+}
+
+.cp-admin-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cp-admin-brand img {
+  width: auto;
+  height: 32px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.cp-admin-brand-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.cp-admin-ops-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #e2e7ff;
+  color: #00288e;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+}
+
+.cp-admin-municipal {
+  display: block;
+  margin-top: 1px;
+  color: #444653;
+  font-size: 10px;
+  line-height: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cp-admin-nav {
+  flex: 1;
+  padding: 20px 8px;
+}
+
+.cp-admin-nav-section {
+  margin-bottom: 20px;
+}
+
+.cp-admin-nav-section:last-child {
+  margin-bottom: 0;
+}
+
+.cp-admin-nav-heading {
+  padding: 4px 8px;
+  color: #757684;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.cp-admin-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cp-admin-sidebar-item {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: #444653;
+  background: transparent;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.cp-admin-sidebar-item:hover {
+  background: #f2f3ff;
+  color: #131b2e;
+}
+
+.cp-admin-sidebar-item.active {
+  background: #1e40af;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.16);
+}
+
+.cp-sidebar-item-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-admin-sidebar-item .material-symbols-outlined {
+  width: 18px;
+  font-size: 18px;
+  line-height: 18px;
+}
+
+.cp-sidebar-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e2e7ff;
+  color: #444653;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+}
+
+.cp-admin-sidebar-item.active .cp-sidebar-badge {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.cp-sidebar-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #ba1a1a;
+}
+
+.cp-admin-user {
+  padding: 8px;
+  border-top: 1px solid rgba(196, 197, 213, 0.2);
+  background: rgba(242, 243, 255, 0.4);
+}
+
+.cp-admin-user-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 8px;
+  transition: background 0.16s ease;
+}
+
+.cp-admin-user-row:hover {
+  background: #eaedff;
+}
+
+.cp-admin-user-info {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-admin-avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.cp-admin-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #00288e;
+  color: #ffffff;
+}
+
+.cp-admin-avatar .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cp-admin-online {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #006a61;
+}
+
+.cp-admin-user-copy {
+  min-width: 0;
+}
+
+.cp-admin-user-copy p {
+  margin: 0;
+  overflow: hidden;
+  color: #131b2e;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cp-admin-user-copy span {
+  display: block;
+  overflow: hidden;
+  color: #444653;
+  font-size: 10px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cp-admin-logout {
+  padding: 4px;
+  border: 0;
+  color: #444653;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cp-admin-logout:hover {
+  color: #ba1a1a;
+}
+
+.cp-admin-logout .material-symbols-outlined {
+  font-size: 18px;
+}
+
+@media (max-width: 1023px) {
+  .cp-admin-sidebar {
+    width: 72px;
+  }
+
+  .cp-admin-brand {
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .cp-admin-brand-link > div,
+  .cp-admin-nav-heading,
+  .cp-admin-sidebar-item > .cp-sidebar-item-left > span:last-child,
+  .cp-sidebar-badge,
+  .cp-admin-user-copy {
+    display: none;
+  }
+
+  .cp-admin-nav {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .cp-admin-sidebar-item {
+    justify-content: center;
+  }
+
+  .cp-sidebar-item-left {
+    justify-content: center;
+  }
+
+  .cp-admin-user-row {
+    justify-content: center;
+  }
+
+  .cp-admin-logout {
+    display: none;
+  }
+}
