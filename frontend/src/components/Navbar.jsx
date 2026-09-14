@@ -10,11 +10,56 @@ export default function Navbar() {
           className="cp-brand"
           aria-label="CivicPulse home"
         >
-          <img
-            alt="CivicPulse Logo"
+          {/* CivicPulse Logo */}
+          <svg
             className="cp-logo"
-            src="https://lh3.googleusercontent.com/aida/AEtjO1WtJaYtIXrqobfcf_MKtEhZLaPkvoLWEy48FfaB55wx0FhgjJrhad7JPt_-LVgM420MBCOq0UbqnlmblLhJUT2ojn-6rOJ227HK0xNrXr6cmjI8LuZKOIVPJD4V7yzfVEoGaVDyjKdo7i2VS0JlfwtxxbOVuAmxKWMsAnTeyqLdXVtRkRxqnJFSymRqDMdU_AAEeq_TDM_oWixhLX08jNkCUDH3Dq8Z_RdLBpl0b3bHlSzSRfXMJS3plgG2"
-          />
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 48 48"
+            width="48"
+            height="48"
+            fill="none"
+            aria-hidden="true"
+          >
+            <rect
+              width="48"
+              height="48"
+              rx="12"
+              fill="#0F172A"
+            />
+
+            <circle
+              cx="24"
+              cy="24"
+              r="16"
+              stroke="#334155"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
+            />
+
+            <path
+              d="M14 24h5l3-6 4 12 3-8 3 4 4-2h2"
+              stroke="#38BDF8"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            <circle
+              cx="24"
+              cy="18"
+              r="3.5"
+              fill="#2563EB"
+              stroke="#FFFFFF"
+              strokeWidth="2"
+            />
+
+            <circle
+              cx="24"
+              cy="18"
+              r="1.5"
+              fill="#60A5FA"
+            />
+          </svg>
 
           <span className="cp-brand-name">
             CivicPulse
