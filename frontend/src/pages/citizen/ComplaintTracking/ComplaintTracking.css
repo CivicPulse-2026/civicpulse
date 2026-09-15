@@ -1802,3 +1802,22 @@
     max-width: none;
   }
 }
+
+/* Track-by-ID lookup (shown for the /citizen/track entry and not-found tickets) */
+.cp-ct-lookup{max-width:520px;margin:0 auto;text-align:center;font-family:Geist,sans-serif}
+.cp-ct-lookup-icon{width:56px;height:56px;margin:0 auto 18px;border-radius:14px;display:grid;place-items:center;background:var(--surface-container,#eaedff);color:var(--primary-container,#1e40af)}
+.cp-ct-lookup-icon .material-symbols-outlined{font-size:28px}
+.cp-ct-lookup h1{margin:0 0 8px;font-size:26px;font-weight:650;letter-spacing:-.02em;color:var(--on-surface,#131b2e)}
+.cp-ct-lookup p{margin:0 0 6px;color:var(--on-surface-variant,#444653);font-size:14px;line-height:1.5}
+.cp-ct-lookup-hint{font-size:13px}
+.cp-ct-lookup-hint code{font-family:monospace;background:var(--surface-low,#f2f3ff);padding:2px 6px;border-radius:5px}
+.cp-ct-lookup-form{display:flex;gap:8px;margin:22px 0 14px}
+.cp-ct-lookup-input{flex:1;display:flex;align-items:center;gap:8px;padding:0 12px;height:48px;border-radius:10px;background:var(--surface-low,#f2f3ff);border:1px solid transparent;transition:.2s}
+.cp-ct-lookup-input:focus-within{border-color:var(--primary-container,#1e40af);background:#fff}
+.cp-ct-lookup-input .material-symbols-outlined{font-size:20px;color:var(--outline,#757684)}
+.cp-ct-lookup-input input{flex:1;border:0;outline:none;background:transparent;font:14px Geist;color:var(--on-surface,#131b2e)}
+.cp-ct-lookup-form button{display:inline-flex;align-items:center;gap:6px;padding:0 18px;height:48px;border:0;border-radius:10px;background:var(--primary-container,#1e40af);color:#fff;font:600 14px Geist;cursor:pointer;transition:.2s}
+.cp-ct-lookup-form button:hover:not(:disabled){background:var(--primary,#00288e)}
+.cp-ct-lookup-form button:disabled{opacity:.55;cursor:default}
+.cp-ct-lookup-form button .material-symbols-outlined{font-size:18px}
+.cp-ct-lookup-report{border:0;background:transparent;color:var(--primary-container,#1e40af);font:600 13px Geist;cursor:pointer;text-decoration:underline}

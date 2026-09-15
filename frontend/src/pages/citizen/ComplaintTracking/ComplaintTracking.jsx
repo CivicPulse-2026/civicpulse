@@ -1,136 +1,110 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
+import { complaintService } from "../../../lib/services";
+import { assetUrl } from "../../../lib/apiClient";
+import { useAuth } from "../../../context/AuthContext";
 import "./ComplaintTracking.css";
 
-const complaint = {
-  id: "CP-2026-004821",
-  title: "Streetlight near Gate 3 is non-functional",
-  status: "IN PROGRESS",
-  sla: "08h 42m remaining",
-  slaTarget: "SLA 96h target",
-  priority: "HIGH PRIORITY",
-  priorityScore: 82,
-  reported: "7 days ago (Oct 18, 2026 • 20:14)",
-  location: "Gate 3 • North Campus Perimeter Highway",
-  resident: "Resident Verified #R-8022",
-  progress: 78,
-};
-
-const timeline = [
-  {
-    title: "Reported",
-    date: "Oct 18, 20:14",
-    detail: "Citizen Ingest",
-    icon: "check",
-    state: "completed",
-  },
-  {
-    title: "AI Triage",
-    date: "Oct 18, 20:15",
-    detail: "94% Confidence",
-    icon: "neurology",
-    state: "completed",
-  },
-  {
-    title: "Assigned",
-    date: "Oct 19, 09:30",
-    detail: "Insp. Vance",
-    icon: "assignment_ind",
-    state: "completed",
-  },
-  {
-    title: "In Progress",
-    date: "Oct 21, 14:10",
-    detail: "Crew Onsite",
-    icon: "engineering",
-    state: "active",
-  },
-  {
-    title: "Resolved",
-    date: "Est. Oct 22, 10:00",
-    detail: "Pending sign-off",
-    icon: "task_alt",
-    state: "pending",
-  },
+// Ordered lifecycle stages used to render the pipeline stepper.
+const PIPELINE = [
+  { key: "New", title: "Reported", icon: "check" },
+  { key: "Assigned", title: "Assigned", icon: "assignment_ind" },
+  { key: "In Progress", title: "In Progress", icon: "engineering" },
+  { key: "Resolved", title: "Resolved", icon: "task_alt" },
 ];
 
-const comments = [
-  {
-    initials: "DV",
-    name: "Senior Insp. David Vance • Electrical Maintenance Div. 4",
-    date: "Oct 21, 14:15",
-    text: "Arrived on site with utility unit 3B. Initial multimeter readings show ballast failure at Pole #GL-408. Replacing internal surge capacitor and rewiring circuit feeder now.",
-    type: "officer",
-  },
-  {
-    initials: "ME",
-    name: "You (Citizen Reporter)",
-    date: "Oct 20, 18:22",
-    text: "Thank you for the update. Please note the sidewalk near the gate gets heavy student foot traffic starting 18:00 every evening. Appreciate the swift dispatch!",
-    type: "citizen",
-  },
-];
-
-const auditEvents = [
-  {
-    title: "Field worker started onsite diagnostic work",
-    description:
-      "Operative David Vance arrived on site. Multimeter test initiated.",
-    date: "Oct 21, 2026 • 14:10",
-    active: true,
-  },
-  {
-    title: "Officer accepted assignment & queued equipment",
-    description: "Boom lift #B-14 allocated from regional depot.",
-    date: "Oct 20, 2026 • 16:45",
-  },
-  {
-    title: "Assigned to Electrical Maintenance Division 4",
-    description:
-      "Triage supervisor routed to local campus zone engineer.",
-    date: "Oct 19, 2026 • 09:30",
-  },
-  {
-    title: "AI automated triage completed",
-    description:
-      "Classified as High Urgency (nighttime pedestrian hazard). SLA locked to 96h.",
-    date: "Oct 18, 2026 • 20:15",
-  },
-  {
-    title: "Complaint submitted via Civic Web Portal",
-    description:
-      "Ticket CP-2026-004821 generated with citizen photo metadata.",
-    date: "Oct 18, 2026 • 20:14",
-  },
-];
+const STATUS_ORDER = ["New", "Assigned", "In Progress", "Resolved"];
 
 function Icon({ children, className = "" }) {
+  return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
+}
+
+// Shown when a ticket lookup fails (or a bad/placeholder ID is opened).
+// Lets the citizen type their real tracking ID instead of hitting a dead end.
+function TrackLookup({ message, currentId }) {
+  const navigate = useNavigate();
+  const [value, setValue] = useState("");
+
+  const go = (e) => {
+    e.preventDefault();
+    const id = value.trim();
+    if (id) navigate(`/citizen/complaints/${encodeURIComponent(id)}`);
+  };
+
   return (
-    <span className={`material-symbols-outlined ${className}`}>
-      {children}
-    </span>
+    <div className="cp-ct-lookup">
+      <div className="cp-ct-lookup-icon">
+        <Icon>search</Icon>
+      </div>
+      <h1>Track a complaint</h1>
+      <p>{message}</p>
+      {currentId && (
+        <p className="cp-ct-lookup-hint">
+          You looked up <code>{currentId}</code>. Double-check the ID from your
+          submission receipt.
+        </p>
+      )}
+      <form onSubmit={go} className="cp-ct-lookup-form">
+        <div className="cp-ct-lookup-input">
+          <Icon>confirmation_number</Icon>
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. CP-2026-000001"
+            aria-label="Complaint tracking ID"
+            autoFocus
+          />
+        </div>
+        <button type="submit" disabled={!value.trim()}>
+          Track <Icon>arrow_forward</Icon>
+        </button>
+      </form>
+      <button className="cp-ct-lookup-report" onClick={() => navigate("/citizen/report")}>
+        Or report a new issue
+      </button>
+    </div>
   );
 }
 
-function Breadcrumb({ onCopy, copied }) {
+function fmt(dt) {
+  if (!dt) return "";
+  const d = new Date(dt);
+  if (Number.isNaN(d.getTime())) return String(dt);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function timeAgo(dt) {
+  if (!dt) return "";
+  const then = new Date(dt).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Date.now() - then;
+  const days = Math.floor(diff / 86400000);
+  if (days >= 1) return `${days} day${days > 1 ? "s" : ""} ago`;
+  const hours = Math.floor(diff / 3600000);
+  if (hours >= 1) return `${hours}h ago`;
+  const mins = Math.floor(diff / 60000);
+  return `${mins}m ago`;
+}
+
+function Breadcrumb({ ticketId, title, onCopy, copied }) {
   return (
     <div className="cp-ct-topbar">
       <div className="cp-ct-breadcrumb">
-        <a href="#" className="cp-ct-back-link">
+        <a href="/" className="cp-ct-back-link">
           <Icon>arrow_back</Icon>
           Complaints
         </a>
-
         <span className="cp-ct-slash">/</span>
-
-        <span className="cp-ct-ticket-code">CP-2026-004821</span>
-
+        <span className="cp-ct-ticket-code">{ticketId}</span>
         <span className="cp-ct-slash">/</span>
-
-        <span className="cp-ct-breadcrumb-title">
-          Gate 3 Luminaire Fault
-        </span>
+        <span className="cp-ct-breadcrumb-title">{title}</span>
       </div>
 
       <div className="cp-ct-actions">
@@ -138,17 +112,14 @@ function Breadcrumb({ onCopy, copied }) {
           <Icon>content_copy</Icon>
           <span>{copied ? "Copied" : "Copy ID"}</span>
         </button>
-
         <button className="cp-ct-utility-btn">
           <Icon>share</Icon>
           <span>Share</span>
         </button>
-
         <button className="cp-ct-utility-btn">
           <Icon>print</Icon>
           <span className="cp-ct-print-label">Print</span>
         </button>
-
         <button className="cp-ct-sms-btn">
           <Icon>notifications_active</Icon>
           <span className="cp-ct-sms-label">SMS Alerts</span>
@@ -158,50 +129,48 @@ function Breadcrumb({ onCopy, copied }) {
   );
 }
 
-function ComplaintHeader() {
+function ComplaintHeader({ complaint }) {
+  const loc = complaint.location || {};
+  const currentIndex = STATUS_ORDER.indexOf(complaint.status);
+  const progress =
+    complaint.status === "Resolved"
+      ? 100
+      : Math.max(10, Math.round(((currentIndex + 1) / STATUS_ORDER.length) * 100));
+
   return (
     <section className="cp-ct-master-card">
       <div className="cp-ct-header-glow" />
-
       <div className="cp-ct-master-content">
         <div className="cp-ct-master-main">
           <div className="cp-ct-header-badges">
             <span className="cp-ct-status-pill">
-              <span className="cp-ct-pulse">
-                <span />
-                <b />
-              </span>
-              IN PROGRESS
+              <span className="cp-ct-pulse"><span /><b /></span>
+              {complaint.status?.toUpperCase()}
             </span>
-
             <span className="cp-ct-sla-pill">
               <Icon>timer</Icon>
-              <strong>08h 42m remaining</strong>
-              <span>(SLA 96h target)</span>
+              <strong>{complaint.sla_due_at ? `Due ${fmt(complaint.sla_due_at)}` : "No SLA"}</strong>
             </span>
-
             <span className="cp-ct-priority-pill">
               <span />
-              HIGH PRIORITY (82/100)
+              {complaint.priority} ({complaint.priority_score}/100)
             </span>
           </div>
 
-          <h1>{complaint.title}</h1>
+          <h1>{complaint.description}</h1>
 
           <div className="cp-ct-meta-row">
             <div>
               <Icon>schedule</Icon>
-              <span>{complaint.reported}</span>
+              <span>{timeAgo(complaint.created_at)} ({fmt(complaint.created_at)})</span>
             </div>
-
             <div>
               <Icon>near_me</Icon>
-              <span>{complaint.location}</span>
+              <span>{loc.address || `${loc.lat?.toFixed?.(4)}, ${loc.lng?.toFixed?.(4)}`}</span>
             </div>
-
             <div>
               <Icon>verified_user</Icon>
-              <span>{complaint.resident}</span>
+              <span>{complaint.reporter_name || "Citizen"}</span>
             </div>
           </div>
         </div>
@@ -209,16 +178,14 @@ function ComplaintHeader() {
         <div className="cp-ct-progress-card">
           <div className="cp-ct-progress-heading">
             <span>Resolution Progress</span>
-            <strong>{complaint.progress}%</strong>
+            <strong>{progress}%</strong>
           </div>
-
           <div className="cp-ct-progress-track">
-            <div style={{ width: `${complaint.progress}%` }} />
+            <div style={{ width: `${progress}%` }} />
           </div>
-
           <div className="cp-ct-progress-footer">
-            <span>Est. Completion</span>
-            <strong>Tomorrow, 10:00</strong>
+            <span>Department</span>
+            <strong>{complaint.department || "General Services"}</strong>
           </div>
         </div>
       </div>
@@ -226,7 +193,8 @@ function ComplaintHeader() {
   );
 }
 
-function LifecyclePipeline() {
+function LifecyclePipeline({ complaint }) {
+  const currentIndex = STATUS_ORDER.indexOf(complaint.status);
   return (
     <section className="cp-ct-card cp-ct-lifecycle">
       <div className="cp-ct-section-heading cp-ct-lifecycle-heading">
@@ -234,66 +202,49 @@ function LifecyclePipeline() {
           <Icon>account_tree</Icon>
           <h2>Lifecycle Pipeline</h2>
         </div>
-
-        <span>
-          Synchronized with Municipal Dispatch Engine v4.2
-        </span>
+        <span>Synchronized with Municipal Dispatch Engine v4.2</span>
       </div>
 
       <div className="cp-ct-stepper">
         <div className="cp-ct-stepper-track" />
         <div className="cp-ct-stepper-progress" />
-
         <div className="cp-ct-steps">
-          {timeline.map((step) => (
-            <div
-              className={`cp-ct-step cp-ct-step-${step.state}`}
-              key={step.title}
-            >
-              {step.state === "active" ? (
-                <div className="cp-ct-active-step-icon">
-                  <span />
-                  <div>
-                    <Icon>{step.icon}</Icon>
+          {PIPELINE.map((step, index) => {
+            const state =
+              index < currentIndex
+                ? "completed"
+                : index === currentIndex
+                ? "active"
+                : "pending";
+            return (
+              <div className={`cp-ct-step cp-ct-step-${state}`} key={step.key}>
+                {state === "active" ? (
+                  <div className="cp-ct-active-step-icon">
+                    <span />
+                    <div><Icon>{step.icon}</Icon></div>
                   </div>
-                </div>
-              ) : (
-                <div className="cp-ct-step-icon">
-                  <Icon>{step.icon}</Icon>
-                </div>
-              )}
-
-              <div className="cp-ct-step-info">
-                <div className="cp-ct-step-title">{step.title}</div>
-                <div className="cp-ct-step-date">{step.date}</div>
-
-                {step.state === "active" ? (
-                  <span className="cp-ct-crew-badge">{step.detail}</span>
                 ) : (
-                  <div className="cp-ct-step-detail">
-                    {step.icon === "check" && (
-                      <Icon>bolt</Icon>
-                    )}
-                    {step.detail}
-                  </div>
+                  <div className="cp-ct-step-icon"><Icon>{step.icon}</Icon></div>
                 )}
+                <div className="cp-ct-step-info">
+                  <div className="cp-ct-step-title">{step.title}</div>
+                  <div className="cp-ct-step-detail">{step.key}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
 
-function CurrentActivity() {
+function CurrentActivity({ complaint }) {
+  const loc = complaint.location || {};
   return (
     <section className="cp-ct-card cp-ct-activity-card">
       <div className="cp-ct-activity-heading">
-        <div className="cp-ct-activity-icon">
-          <Icon>radar</Icon>
-        </div>
-
+        <div className="cp-ct-activity-icon"><Icon>radar</Icon></div>
         <div>
           <span>Current Activity Pulse</span>
           <h3>What's happening now?</h3>
@@ -301,36 +252,28 @@ function CurrentActivity() {
       </div>
 
       <p className="cp-ct-activity-text">
-        Electrical maintenance team has been assigned and a field technician
-        is actively testing the luminaire driver and checking underground
-        wiring junction boxes adjacent to{" "}
-        <code>Pole #GL-408</code>.
+        This complaint is currently <code>{complaint.status}</code>
+        {complaint.assigned_to ? <> and assigned to <code>{complaint.assigned_to}</code></> : null}.
+        {" "}Category: {complaint.category}.
       </p>
 
       <div className="cp-ct-dispatch-box">
         <div className="cp-ct-dispatch-info">
-          <div className="cp-ct-dispatch-icon">
-            <Icon>local_shipping</Icon>
-          </div>
-
+          <div className="cp-ct-dispatch-icon"><Icon>local_shipping</Icon></div>
           <div>
-            <strong>Crew 3B dispatched with boom truck #B-14</strong>
+            <strong>{complaint.crew || complaint.assigned_to || "Awaiting assignment"}</strong>
             <span>
-              Live coordinate broadcast: 42.3601° N, 71.0589° W
+              Location: {loc.lat != null ? `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : "Unknown"}
             </span>
           </div>
-        </div>
-
-        <div className="cp-ct-extension">
-          <Icon>call</Icon>
-          Ext. 4082
         </div>
       </div>
     </section>
   );
 }
 
-function ResolutionEvidence({ onResolve, onReopen }) {
+function ResolutionEvidence({ complaint, canAct, onResolve, onReopen, busy }) {
+  const photos = complaint.photos || [];
   return (
     <section className="cp-ct-card cp-ct-evidence-card">
       <div className="cp-ct-evidence-heading">
@@ -339,88 +282,50 @@ function ResolutionEvidence({ onResolve, onReopen }) {
             <Icon>verified</Icon>
             <h3>Resolution Status & Evidence</h3>
           </div>
-
-          <p>
-            Automated visual proof captured by field operative Vance
-          </p>
+          <p>Photos submitted with this report</p>
         </div>
-
-        <span>Stage: Inspection Proof</span>
+        <span>Stage: {complaint.status}</span>
       </div>
 
-      <div className="cp-ct-before-after">
-        <div className="cp-ct-evidence-panel">
-          <div className="cp-ct-evidence-image">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuD01h38Pq7SkSEczhGbZ7jlHo0faWs-zjUh4MOsVafWvLGfC6UBq7UXQEuj7-LXHOcTqY6REKL4IE48UHI9mtnfNE6wrNEBFwt1K7kMtkUTEMOUT-RhqP7TzLwNqXisTIEscfUknj0kWfMsPXenzJXmdvd01lflP9QG7y3O302FaWjDZoUUojRc4qusafU3KMr688YTb7k6kHOPdsFvuqfxFbWVTJ4M1fCZB_LiPhtU0DRqeUuKZ3TGrw"
-              alt="Dark unlit municipal campus pathway"
-            />
-
-            <span className="cp-ct-image-label cp-ct-before-label">
-              BEFORE: Oct 18 • 20:14
-            </span>
-          </div>
-
-          <div className="cp-ct-image-footer">
-            <span>Report Attachment #1</span>
-            <strong>
-              <Icon>cancel</Icon>
-              No Illumination
-            </strong>
-          </div>
+      {photos.length ? (
+        <div className="cp-ct-before-after">
+          {photos.slice(0, 2).map((p, i) => (
+            <div className="cp-ct-evidence-panel" key={i}>
+              <div className="cp-ct-evidence-image">
+                <img src={assetUrl(p)} alt={`Report attachment ${i + 1}`} />
+                <span className="cp-ct-image-label cp-ct-before-label">
+                  ATTACHMENT #{i + 1}
+                </span>
+              </div>
+              <div className="cp-ct-image-footer">
+                <span>Report Attachment #{i + 1}</span>
+              </div>
+            </div>
+          ))}
         </div>
-
-        <div className="cp-ct-evidence-panel">
-          <div className="cp-ct-evidence-image">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYIlDruqs231awQcgnrxr74iZ3gcxy_nLu-2ik265ZBGddWcA8g5RZYN6ABXjFKd9CHGt-j1u4pBBRLBuE57cvElcAZLRD6Sod4Ba0moGH5mrw-CzFbzhTmAYx6Lb_cIbxkyc-qn2C7YYnl4yYUGFeaenZkkp0llZT5QRwXBrE1cqLNLHbvCjWqNutoZlZEmQwKY9sJ_07Iv840B-oc2AyhqFwDuJohnFviKE3FWV2_48BKJ3xkv0Ktw"
-              alt="High-output LED streetlight"
-            />
-
-            <span className="cp-ct-image-label cp-ct-after-label">
-              <Icon>check_circle</Icon>
-              PROPOSED FIX: Oct 21 • 15:30
-            </span>
-          </div>
-
-          <div className="cp-ct-image-footer">
-            <span>Field Crew Benchmark</span>
-            <strong className="cp-ct-success-text">
-              <Icon>check</Icon>
-              120W Driver Operational
-            </strong>
-          </div>
-        </div>
-      </div>
+      ) : (
+        <p className="cp-ct-activity-text">No photo evidence attached to this report.</p>
+      )}
 
       <div className="cp-ct-confirmation">
         <div className="cp-ct-confirmation-info">
-          <div className="cp-ct-confirmation-icon">
-            <Icon>how_to_reg</Icon>
-          </div>
-
+          <div className="cp-ct-confirmation-icon"><Icon>how_to_reg</Icon></div>
           <div>
             <strong>Was the issue resolved to your satisfaction?</strong>
             <span>
-              Your confirmation directly closes this ticket and updates our
-              municipal audit ledger.
+              {canAct
+                ? "Your confirmation updates the municipal audit ledger."
+                : "Sign in to confirm or reopen this ticket."}
             </span>
           </div>
         </div>
 
         <div className="cp-ct-confirmation-actions">
-          <button
-            className="cp-ct-close-ticket"
-            onClick={onResolve}
-          >
+          <button className="cp-ct-close-ticket" onClick={onResolve} disabled={!canAct || busy}>
             <Icon>check_circle</Icon>
             Yes, Close Ticket
           </button>
-
-          <button
-            className="cp-ct-reopen"
-            onClick={onReopen}
-          >
+          <button className="cp-ct-reopen" onClick={onReopen} disabled={!canAct || busy}>
             <Icon>flag</Icon>
             Reopen
           </button>
@@ -430,25 +335,14 @@ function ResolutionEvidence({ onResolve, onReopen }) {
   );
 }
 
-function CommunicationLog() {
+function CommunicationLog({ messages, canComment, onSubmit }) {
   const [comment, setComment] = useState("");
-  const [messages, setMessages] = useState(comments);
 
-  const submitComment = () => {
+  const submit = async () => {
     if (!comment.trim()) return;
-
-    setMessages((current) => [
-      ...current,
-      {
-        initials: "ME",
-        name: "You (Citizen Reporter)",
-        date: "Just now",
-        text: comment.trim(),
-        type: "citizen",
-      },
-    ]);
-
+    const text = comment.trim();
     setComment("");
+    await onSubmit(text);
   };
 
   return (
@@ -458,59 +352,58 @@ function CommunicationLog() {
           <Icon>forum</Icon>
           <h3>Communication Log</h3>
         </div>
-
         <span>{messages.length} messages archived</span>
       </div>
 
       <div className="cp-ct-comments">
-        {messages.map((message, index) => (
-          <div
-            className={`cp-ct-comment ${
-              message.type === "officer"
-                ? "cp-ct-comment-officer"
-                : "cp-ct-comment-citizen"
-            }`}
-            key={`${message.date}-${index}`}
-          >
+        {messages.length === 0 && (
+          <p className="cp-ct-activity-text">No messages yet.</p>
+        )}
+        {messages.map((message, index) => {
+          const isOfficer = message.author_role === "officer" || message.author_role === "admin";
+          const name = message.author_name || "Citizen";
+          const initials = name
+            .split(" ")
+            .map((w) => w[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase();
+          return (
             <div
-              className={`cp-ct-avatar ${
-                message.type === "officer"
-                  ? "cp-ct-avatar-officer"
-                  : "cp-ct-avatar-citizen"
-              }`}
+              className={`cp-ct-comment ${isOfficer ? "cp-ct-comment-officer" : "cp-ct-comment-citizen"}`}
+              key={`${message.created_at}-${index}`}
             >
-              {message.initials}
-            </div>
-
-            <div className="cp-ct-comment-content">
-              <div className="cp-ct-comment-meta">
-                <strong>{message.name}</strong>
-                <span>{message.date}</span>
+              <div className={`cp-ct-avatar ${isOfficer ? "cp-ct-avatar-officer" : "cp-ct-avatar-citizen"}`}>
+                {initials}
               </div>
-
-              <p>{message.text}</p>
+              <div className="cp-ct-comment-content">
+                <div className="cp-ct-comment-meta">
+                  <strong>{name}</strong>
+                  <span>{fmt(message.created_at)}</span>
+                </div>
+                <p>{message.text}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="cp-ct-comment-form">
         <label htmlFor="comment-input">
-          Post updates or upload supplemental photo
+          {canComment ? "Post an update" : "Sign in to post updates"}
         </label>
-
         <div className="cp-ct-comment-input-row">
           <input
             id="comment-input"
             value={comment}
+            disabled={!canComment}
             onChange={(event) => setComment(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") submitComment();
+              if (event.key === "Enter") submit();
             }}
             placeholder="Add a comment or additional evidence..."
           />
-
-          <button onClick={submitComment}>
+          <button onClick={submit} disabled={!canComment}>
             <Icon>send</Icon>
             Submit
           </button>
@@ -520,36 +413,20 @@ function CommunicationLog() {
   );
 }
 
-function TicketProfile() {
+function TicketProfile({ complaint }) {
+  const loc = complaint.location || {};
   const rows = [
-    {
-      icon: "category",
-      label: "Category",
-      value: "Streetlight & Municipal Power",
-    },
-    {
-      icon: "tag",
-      label: "Asset Tag",
-      value: "POLE-GL-408",
-      code: true,
-    },
-    {
-      icon: "pin_drop",
-      label: "Location",
-      value: "Gate 3, North Perimeter",
-    },
-    {
-      icon: "apartment",
-      label: "Department",
-      value: "Electrical Maintenance Div. 4",
-    },
+    { icon: "category", label: "Category", value: complaint.category },
+    { icon: "tag", label: "Ticket", value: complaint.ticket_id, code: true },
+    { icon: "pin_drop", label: "Location", value: loc.address || "—" },
+    { icon: "apartment", label: "Department", value: complaint.department || "—" },
   ];
 
   return (
     <section className="cp-ct-card cp-ct-profile-card">
       <div className="cp-ct-profile-heading">
         <h3>Ticket Profile</h3>
-        <span>CP-2026-004821</span>
+        <span>{complaint.ticket_id}</span>
       </div>
 
       <div className="cp-ct-profile-rows">
@@ -559,10 +436,7 @@ function TicketProfile() {
               <Icon>{row.icon}</Icon>
               <span>{row.label}</span>
             </div>
-
-            <strong className={row.code ? "cp-ct-code-value" : ""}>
-              {row.value}
-            </strong>
+            <strong className={row.code ? "cp-ct-code-value" : ""}>{row.value}</strong>
           </div>
         ))}
 
@@ -571,29 +445,25 @@ function TicketProfile() {
             <Icon>badge</Icon>
             <span>Assigned Officer</span>
           </div>
-
           <div className="cp-ct-officer">
-            <strong>Insp. David Vance</strong>
-            <span>Badge #7412</span>
+            <strong>{complaint.assigned_to || "Unassigned"}</strong>
           </div>
         </div>
 
         <div className="cp-ct-profile-row">
           <div>
             <Icon>shield</Icon>
-            <span>Warranty / SLA</span>
+            <span>SLA Due</span>
           </div>
-
-          <strong className="cp-ct-sla-value">
-            Standard 96h Civic Guarantee
-          </strong>
+          <strong className="cp-ct-sla-value">{fmt(complaint.sla_due_at) || "—"}</strong>
         </div>
       </div>
     </section>
   );
 }
 
-function LocationMap() {
+function LocationMap({ complaint }) {
+  const loc = complaint.location || {};
   return (
     <section className="cp-ct-card cp-ct-map-card">
       <div className="cp-ct-map-heading">
@@ -601,130 +471,32 @@ function LocationMap() {
           <Icon>map</Icon>
           <h3>Location & Grid Marker</h3>
         </div>
-
-        <span>Sector N-4</span>
+        <span>{loc.ward || "Sector"}</span>
       </div>
 
       <div className="cp-ct-map">
-        <svg
-          viewBox="0 0 400 250"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M-20 60 H420"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="28"
-          />
-
-          <path
-            d="M120 -20 V270"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="24"
-          />
-
-          <path
-            d="M280 60 Q300 160 420 180"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="20"
-          />
-
-          <path
-            d="M-20 84 H420"
-            stroke="#CBD5E1"
-            strokeDasharray="4 4"
-            strokeWidth="3"
-          />
-
-          <path
-            d="M100 -20 V270"
-            stroke="#CBD5E1"
-            strokeDasharray="4 4"
-            strokeWidth="3"
-          />
-
-          <rect
-            fill="#E2E7FF"
-            height="90"
-            opacity="0.6"
-            rx="6"
-            width="120"
-            x="140"
-            y="85"
-          />
-
-          <text
-            fill="#444653"
-            fontFamily="Geist"
-            fontSize="10"
-            fontWeight="600"
-            x="150"
-            y="135"
-          >
-            RESEARCH BLDG 4
-          </text>
-
-          <rect
-            fill="#DAE2FD"
-            height="120"
-            opacity="0.4"
-            rx="6"
-            width="80"
-            x="20"
-            y="85"
-          />
-
-          <text
-            fill="#444653"
-            fontFamily="Geist"
-            fontSize="9"
-            x="30"
-            y="145"
-          >
-            SECURITY LOT
-          </text>
-
-          <path
-            d="M110 50 L110 70 M115 50 L115 70 M120 50 L120 70 M125 50 L125 70 M130 50 L130 70"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-          />
-
-          <path
-            d="M-10 40 Q120 45 280 40 T410 40"
-            opacity="0.5"
-            stroke="#3755C3"
-            strokeDasharray="3 3"
-            strokeWidth="1.5"
-          />
+        <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg">
+          <path d="M-20 60 H420" stroke="currentColor" strokeLinecap="round" strokeWidth="28" />
+          <path d="M120 -20 V270" stroke="currentColor" strokeLinecap="round" strokeWidth="24" />
+          <path d="M280 60 Q300 160 420 180" stroke="currentColor" strokeLinecap="round" strokeWidth="20" />
+          <path d="M-20 84 H420" stroke="#CBD5E1" strokeDasharray="4 4" strokeWidth="3" />
+          <path d="M100 -20 V270" stroke="#CBD5E1" strokeDasharray="4 4" strokeWidth="3" />
         </svg>
 
         <div className="cp-ct-map-hotspot">
           <div className="cp-ct-map-hotspot-icon">
             <span />
-            <div>
-              <Icon>light</Icon>
-            </div>
+            <div><Icon>light</Icon></div>
           </div>
-
-          <span>Pole #GL-408 (Outage)</span>
-        </div>
-
-        <div className="cp-ct-map-feed">
-          <div>
-            <span />
-            Feed: Substation 14B
-          </div>
-          <small>Grid Junction N-40</small>
+          <span>{loc.address || "Reported location"}</span>
         </div>
       </div>
 
       <div className="cp-ct-map-footer">
-        <span>Lat: 42.36014 • Lon: -71.05891</span>
-
-        <a href="#">
+        <span>
+          {loc.lat != null ? `Lat: ${loc.lat.toFixed(5)} • Lon: ${loc.lng.toFixed(5)}` : "Coordinates unavailable"}
+        </span>
+        <a href="/admin/map">
           Open Full GIS Viewer
           <Icon>open_in_new</Icon>
         </a>
@@ -733,7 +505,7 @@ function LocationMap() {
   );
 }
 
-function AuditTrail() {
+function AuditTrail({ events }) {
   return (
     <section className="cp-ct-card cp-ct-audit-card">
       <div className="cp-ct-audit-heading">
@@ -741,28 +513,18 @@ function AuditTrail() {
           <Icon>history</Icon>
           <h3>Audit Trail</h3>
         </div>
-
-        <span>
-          <i />
-          Immutably Logged
-        </span>
+        <span><i />Immutably Logged</span>
       </div>
 
       <div className="cp-ct-audit-list">
-        {auditEvents.map((event) => (
-          <div className="cp-ct-audit-event" key={event.title}>
-            <span
-              className={
-                event.active
-                  ? "cp-ct-audit-dot cp-ct-audit-dot-active"
-                  : "cp-ct-audit-dot"
-              }
-            />
-
+        {events.length === 0 && <p className="cp-ct-activity-text">No audit events yet.</p>}
+        {events.map((event, index) => (
+          <div className="cp-ct-audit-event" key={`${event.created_at}-${index}`}>
+            <span className={index === 0 ? "cp-ct-audit-dot cp-ct-audit-dot-active" : "cp-ct-audit-dot"} />
             <div>
-              <strong>{event.title}</strong>
-              <p>{event.description}</p>
-              <time>{event.date}</time>
+              <strong>{event.action?.replace(/_/g, " ") || "event"}</strong>
+              <p>{event.detail}</p>
+              <time>{event.actor_name} • {fmt(event.created_at)}</time>
             </div>
           </div>
         ))}
@@ -772,32 +534,131 @@ function AuditTrail() {
 }
 
 export default function ComplaintTracking() {
+  const { id } = useParams();
+  const { isAuthenticated } = useAuth();
+
+  const [complaint, setComplaint] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [audit, setAudit] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [resolutionMessage, setResolutionMessage] = useState("");
+  const [toast, setToast] = useState("");
 
-  const copyComplaintId = async () => {
+  const load = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    // No ticket in the URL (the /citizen/track entry) — just show the lookup.
+    if (!id) {
+      setComplaint(null);
+      setLoading(false);
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(complaint.id);
-      setCopied(true);
+      const [c, cm, au] = await Promise.all([
+        complaintService.get(id),
+        complaintService.comments(id).catch(() => ({ comments: [] })),
+        complaintService.audit(id).catch(() => ({ events: [] })),
+      ]);
+      setComplaint(c.complaint);
+      setComments(cm.comments || []);
+      // audit newest-first for display
+      setAudit((au.events || []).slice().reverse());
+    } catch (err) {
+      setError(err?.message || "Could not load this complaint.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-      setTimeout(() => {
-        setCopied(false);
-      }, 1800);
+  useEffect(() => {
+    const t = window.setTimeout(load, 0);
+    return () => window.clearTimeout(t);
+  }, [load]);
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(complaint?.ticket_id || id);
     } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      /* ignore */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const resolveTarget = complaint?.ticket_id || complaint?.id || id;
+
+  const handleResolve = async () => {
+    setBusy(true);
+    try {
+      await complaintService.resolve(resolveTarget);
+      setToast("Ticket marked as resolved.");
+      await load();
+    } catch (err) {
+      setToast(err?.message || "Could not resolve ticket.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleResolve = () => {
-    setResolutionMessage(
-      "Thank you! Ticket marked as Citizen-Verified Resolved."
-    );
+  const handleReopen = async () => {
+    setBusy(true);
+    try {
+      await complaintService.reopen(resolveTarget);
+      setToast("Ticket reopened.");
+      await load();
+    } catch (err) {
+      setToast(err?.message || "Could not reopen ticket.");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleReopen = () => {
-    setResolutionMessage("Ticket flagged for further review.");
+  const handleComment = async (text) => {
+    try {
+      await complaintService.addComment(resolveTarget, text);
+      const cm = await complaintService.comments(resolveTarget);
+      setComments(cm.comments || []);
+    } catch (err) {
+      setToast(err?.message || "Could not post comment.");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="cp-ct-page">
+        <Navbar />
+        <main className="cp-ct-main">
+          <div className="cp-ct-container" style={{ padding: "80px 0", textAlign: "center", color: "#64748b" }}>
+            Loading complaint…
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !complaint) {
+    return (
+      <div className="cp-ct-page">
+        <Navbar />
+        <main className="cp-ct-main">
+          <div className="cp-ct-container" style={{ padding: "72px 0" }}>
+            <TrackLookup
+              message={
+                id
+                  ? error || "We couldn't find that complaint."
+                  : "Enter your tracking ID to see the latest status of your report."
+              }
+              currentId={id}
+            />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="cp-ct-page">
@@ -806,43 +667,46 @@ export default function ComplaintTracking() {
       <main className="cp-ct-main">
         <div className="cp-ct-container">
           <Breadcrumb
-            onCopy={copyComplaintId}
+            ticketId={complaint.ticket_id}
+            title={complaint.category}
+            onCopy={copyId}
             copied={copied}
           />
 
-          {resolutionMessage && (
+          {toast && (
             <div className="cp-ct-toast">
               <Icon>check_circle</Icon>
-              {resolutionMessage}
-              <button
-                onClick={() => setResolutionMessage("")}
-                aria-label="Close"
-              >
+              {toast}
+              <button onClick={() => setToast("")} aria-label="Close">
                 <Icon>close</Icon>
               </button>
             </div>
           )}
 
-          <ComplaintHeader />
-
-          <LifecyclePipeline />
+          <ComplaintHeader complaint={complaint} />
+          <LifecyclePipeline complaint={complaint} />
 
           <div className="cp-ct-content-grid">
             <div className="cp-ct-left-column">
-              <CurrentActivity />
-
+              <CurrentActivity complaint={complaint} />
               <ResolutionEvidence
+                complaint={complaint}
+                canAct={isAuthenticated}
+                busy={busy}
                 onResolve={handleResolve}
                 onReopen={handleReopen}
               />
-
-              <CommunicationLog />
+              <CommunicationLog
+                messages={comments}
+                canComment={isAuthenticated}
+                onSubmit={handleComment}
+              />
             </div>
 
             <aside className="cp-ct-right-column">
-              <TicketProfile />
-              <LocationMap />
-              <AuditTrail />
+              <TicketProfile complaint={complaint} />
+              <LocationMap complaint={complaint} />
+              <AuditTrail events={audit} />
             </aside>
           </div>
         </div>

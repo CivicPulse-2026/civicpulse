@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import "./AdminSidebar.css";
 
+// Only routes that actually exist are listed, so the sidebar never leads
+// anywhere broken.
 const NAV_SECTIONS = [
   {
     title: "Overview",
@@ -11,25 +13,14 @@ const NAV_SECTIONS = [
   {
     title: "Operations",
     items: [
-      { key: "complaints", icon: "inbox", label: "Complaints", badge: "24", path: "/admin/complaints" },
-      { key: "assignments", icon: "how_to_reg", label: "Assignments", path: "/admin/assignments" },
-      { key: "sla-monitor", icon: "alarm_on", label: "SLA Monitor", dot: true, path: "/admin/sla" },
+      { key: "complaints", icon: "inbox", label: "Complaints", path: "/admin/complaints" },
     ],
   },
   {
     title: "Intelligence",
     items: [
-      { key: "issue-clusters", icon: "hub", label: "Issue Clusters", path: "/admin/clusters" },
       { key: "city-map", icon: "map", label: "City Map", path: "/admin/map" },
       { key: "analytics", icon: "query_stats", label: "Analytics", path: "/admin/analytics" },
-    ],
-  },
-  {
-    title: "Management",
-    items: [
-      { key: "departments", icon: "corporate_fare", label: "Departments", path: "/admin/departments" },
-      { key: "users", icon: "group", label: "Users", path: "/admin/users" },
-      { key: "settings", icon: "settings", label: "Settings", path: "/admin/settings" },
     ],
   },
 ];
@@ -38,8 +29,13 @@ function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
 }
 
-export default function AdminSidebar({ activeKey = "dashboard", onLogout }) {
+export default function AdminSidebar({ activeKey = "dashboard", onLogout, user }) {
   const location = useLocation();
+
+  const displayName = user?.name || "Municipal User";
+  const roleLabel = user?.role
+    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+    : "Staff";
 
   const isActive = (item) => {
     if (activeKey) return activeKey === item.key;
@@ -111,8 +107,8 @@ export default function AdminSidebar({ activeKey = "dashboard", onLogout }) {
             </div>
 
             <div className="cp-admin-user-copy">
-              <p>Rahul Sharma</p>
-              <span>Director · Ward 4</span>
+              <p>{displayName}</p>
+              <span>{roleLabel}{user?.email ? ` · ${user.email}` : ""}</span>
             </div>
           </div>
 

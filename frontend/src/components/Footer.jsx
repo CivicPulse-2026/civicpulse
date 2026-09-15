@@ -1,4 +1,23 @@
+import { useEffect, useState } from "react";
+import { publicService } from "../lib/services";
+
 export default function Footer() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    publicService
+      .stats()
+      .then((s) => active && setStats(s))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const efficiency =
+    stats?.sla_compliance != null ? `${stats.sla_compliance}%` : "live";
+
   return (
     <footer className="cp-footer">
       <div className="cp-container cp-footer-inner">
@@ -9,7 +28,7 @@ export default function Footer() {
           </div>
           <div className="cp-footer-status">
             <span className="cp-status-dot cp-status-dot-green" />
-            <span>Guaranteed SLA Response • 99.8% Resolution Efficiency</span>
+            <span>SLA Compliance • {efficiency} on-time resolution</span>
           </div>
         </div>
 

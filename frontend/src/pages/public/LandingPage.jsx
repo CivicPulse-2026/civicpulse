@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
+import { publicService } from "../../lib/services";
 
 const pipeline = [
   ["01 // INTAKE", "edit_note", "Report", "Resident submits issue via voice, web portal, or mobile snap with zero bureaucratic friction.", "GEO-TAG • PHOTO UPLOAD"],
@@ -73,7 +75,30 @@ function RadarVisual() {
   );
 }
 
+// Format a number with thousands separators; falls back to a dash while loading.
+function fmtNum(n) {
+  if (n == null) return "—";
+  return Number(n).toLocaleString();
+}
+
 export default function LandingPage() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    publicService
+      .stats()
+      .then((s) => {
+        if (active) setStats(s);
+      })
+      .catch(() => {
+        /* landing page still renders with placeholders if the API is down */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="cp-page">
       <Navbar />
@@ -95,10 +120,42 @@ export default function LandingPage() {
         </section>
 
         <section className="cp-trust-bar"><div className="cp-container cp-metrics">
-          <MetricCard label="Issues Reported" icon="receipt_long" value="2,481" suffix="+12% mo" detail="Aggregated 30d" accent="cp-blue-text" visual="up" />
-          <MetricCard label="Issues Resolved" icon="task_alt" value="1,797" suffix="Active field" detail="72.4% clearance" accent="cp-green-text" visual="progress" />
-          <MetricCard label="SLA Compliance" icon="verified" value="91.4%" suffix=">90% Goal" detail="Municipal standard" accent="cp-blue-text" visual="optimal" />
-          <MetricCard label="Avg. Resolution" icon="speed" value="38.6" suffix="hrs" detail="-14.2 hrs YoY" accent="cp-green-text" visual="down" />
+          <MetricCard
+            label="Issues Reported"
+            icon="receipt_long"
+            value={fmtNum(stats?.total_reported)}
+            suffix="all time"
+            detail={`${fmtNum(stats?.active)} currently active`}
+            accent="cp-blue-text"
+            visual="up"
+          />
+          <MetricCard
+            label="Issues Resolved"
+            icon="task_alt"
+            value={fmtNum(stats?.resolved)}
+            suffix="closed"
+            detail={stats ? `${stats.resolution_rate}% clearance` : "Live from operations"}
+            accent="cp-green-text"
+            visual="progress"
+          />
+          <MetricCard
+            label="SLA Compliance"
+            icon="verified"
+            value={stats ? `${stats.sla_compliance}%` : "—"}
+            suffix=">90% goal"
+            detail="Municipal standard"
+            accent="cp-blue-text"
+            visual="optimal"
+          />
+          <MetricCard
+            label="Avg. Resolution"
+            icon="speed"
+            value={stats ? String(stats.avg_resolution_hours) : "—"}
+            suffix="hrs"
+            detail={stats ? `${fmtNum(stats.communities)} communities served` : "Live average"}
+            accent="cp-green-text"
+            visual="down"
+          />
         </div></section>
 
         <section id="how-it-works" className="cp-container cp-section">

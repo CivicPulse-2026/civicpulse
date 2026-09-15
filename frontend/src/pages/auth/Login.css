@@ -1,0 +1,346 @@
+.cp-login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(30, 64, 175, 0.08), transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(0, 106, 97, 0.08), transparent 45%),
+    var(--background);
+  font-family: "Geist", sans-serif;
+}
+
+.cp-login-card {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(33, 48, 90, 0.12);
+  padding: 36px 32px;
+}
+
+.cp-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.cp-login-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--primary-container);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.cp-login-brand strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.cp-login-brand span {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.cp-login-card h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.cp-login-subtitle {
+  margin: 0 0 24px;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cp-login-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: var(--surface-low);
+}
+
+.cp-login-tabs button {
+  flex: 1;
+  height: 38px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.cp-login-tabs button.active {
+  background: #fff;
+  color: var(--primary-container);
+  box-shadow: 0 1px 4px rgba(33, 48, 90, 0.1);
+}
+
+.cp-signup-roles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.cp-signup-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 6px;
+  border: 1.5px solid var(--surface-container);
+  border-radius: 10px;
+  background: var(--surface-low);
+  color: var(--on-surface);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: 0.18s;
+}
+
+.cp-signup-role .material-symbols-outlined {
+  font-size: 22px;
+  color: var(--outline);
+}
+
+.cp-signup-role strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cp-signup-role small {
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--on-surface-variant);
+}
+
+.cp-signup-role:hover {
+  border-color: var(--primary-container);
+}
+
+.cp-signup-role.selected {
+  border-color: var(--primary-container);
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(30, 64, 175, 0.12);
+}
+
+.cp-signup-role.selected .material-symbols-outlined {
+  color: var(--primary-container);
+}
+
+.cp-login-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ffebee;
+  color: var(--error);
+  font-size: 13px;
+}
+
+.cp-login-error .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cp-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cp-login-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.cp-login-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 46px;
+  border-radius: 9px;
+  background: var(--surface-low);
+  border: 1px solid transparent;
+  transition: 0.2s;
+}
+
+.cp-login-input:focus-within {
+  border-color: var(--primary-container);
+  background: #fff;
+}
+
+.cp-login-input .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--outline);
+}
+
+.cp-login-input input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--on-surface);
+}
+
+.cp-login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  height: 46px;
+  border: none;
+  border-radius: 9px;
+  background: var(--primary-container);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cp-login-submit:hover:not(:disabled) {
+  background: var(--primary);
+  transform: translateY(-1px);
+}
+
+.cp-login-submit:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.cp-login-submit .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cp-login-demo {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--surface-container);
+}
+
+.cp-login-demo > span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+
+.cp-login-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-role-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--surface-container);
+  border-radius: 10px;
+  background: var(--surface-low);
+  color: var(--on-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.cp-role-card:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--primary-container);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(33, 48, 90, 0.08);
+}
+
+.cp-role-card:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cp-role-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  color: #fff;
+}
+
+.cp-role-icon .material-symbols-outlined {
+  font-size: 21px;
+}
+
+/* Color-code each role so it is instantly recognizable */
+.cp-role-admin .cp-role-icon {
+  background: var(--primary-container);
+}
+
+.cp-role-officer .cp-role-icon {
+  background: var(--secondary);
+}
+
+.cp-role-citizen .cp-role-icon {
+  background: #b45309;
+}
+
+.cp-role-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-role-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.cp-role-text small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--on-surface-variant);
+}
+
+.cp-role-arrow {
+  font-size: 18px;
+  color: var(--outline);
+  flex: 0 0 auto;
+  transition: 0.18s;
+}
+
+.cp-role-card:hover:not(:disabled) .cp-role-arrow {
+  color: var(--primary-container);
+  transform: translateX(2px);
+}

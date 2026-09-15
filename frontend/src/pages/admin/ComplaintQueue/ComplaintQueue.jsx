@@ -1,162 +1,118 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../components/AdminSidebar/AdminSidebar";
+import { adminService, analyticsService } from "../../../lib/services";
+import { useAuth } from "../../../context/AuthContext";
 import "./ComplaintQueue.css";
 
-const COMPLAINTS = [
-  {
-    id: "CP-2026-004821",
-    title: "Streetlight near Gate 3 non-functional",
-    detail: "Reported by Resident #8921 • Underground feeder trip",
-    category: "Streetlight",
-    icon: "lightbulb",
-    categoryClass: "streetlight",
-    location: "Gate 3, North Perimeter",
-    priority: "HIGH",
-    status: "IN PROGRESS",
-    statusClass: "progress",
-    assignee: "Rahul Sharma",
-    initials: "RS",
-    department: "Electrical Maint.",
-    age: "7d ago",
-    sla: "08h 42m",
-    slaLabel: "APPROACHING",
-    slaClass: "approaching",
-  },
-  {
-    id: "CP-2026-004822",
-    title: "Water supply interruption & pipe burst",
-    detail: "Main pressure line cracked • Flooding roadway",
-    category: "Water",
-    icon: "water_drop",
-    categoryClass: "water",
-    location: "Ward 12, Sector 4",
-    priority: "CRITICAL",
-    status: "NEW",
-    statusClass: "new",
-    assignee: "Unassigned",
-    initials: "--",
-    department: "Water Resources",
-    age: "2d ago",
-    sla: "06h 12m",
-    slaLabel: "CRITICAL SLA",
-    slaClass: "critical",
-    critical: true,
-  },
-  {
-    id: "CP-2026-004823",
-    title: "Garbage accumulation at market entrance",
-    detail: "Overfilled commercial bins spillover",
-    category: "Garbage",
-    icon: "delete",
-    categoryClass: "garbage",
-    location: "Central Market Lane B",
-    priority: "MEDIUM",
-    status: "ASSIGNED",
-    statusClass: "assigned",
-    assignee: "Team 02",
-    initials: "T2",
-    department: "Sanitation Dept",
-    age: "1d ago",
-    sla: "31h 15m",
-    slaLabel: "ON TRACK",
-    slaClass: "on-track",
-  },
-  {
-    id: "CP-2026-004824",
-    title: "Deep pothole creating vehicle hazard",
-    detail: "Southbound fast lane • Multiple tire puncture reports",
-    category: "Road & Transit",
-    icon: "commute",
-    categoryClass: "road",
-    location: "Ring Road Jct 9",
-    priority: "HIGH",
-    status: "IN PROGRESS",
-    statusClass: "progress",
-    assignee: "Asphalt Crew 1",
-    initials: "AC",
-    department: "Public Works",
-    age: "3d ago",
-    sla: "18h 30m",
-    slaLabel: "ON TRACK",
-    slaClass: "on-track",
-  },
-  {
-    id: "CP-2026-004825",
-    title: "Open storm drain grate near school",
-    detail: "Immediate pedestrian fallback risk • Children route",
-    category: "Safety Hazard",
-    icon: "warning",
-    categoryClass: "safety",
-    location: "West Park Ave, Gate 2",
-    priority: "CRITICAL",
-    status: "ASSIGNED",
-    statusClass: "assigned",
-    assignee: "Eng. Miller",
-    initials: "EM",
-    department: "Civil Infra",
-    age: "6h ago",
-    sla: "03h 45m",
-    slaLabel: "APPROACHING",
-    slaClass: "critical-approaching",
-  },
-  {
-    id: "CP-2026-004826",
-    title: "Traffic signal timing desync during peak",
-    detail: "Recalibrated cycle offset • Fixed telemetry link",
-    category: "Road & Transit",
-    icon: "traffic",
-    categoryClass: "road",
-    location: "Main St & 4th Ave",
-    priority: "HIGH",
-    status: "RESOLVED",
-    statusClass: "resolved",
-    assignee: "Team 09",
-    initials: "T9",
-    department: "Traffic Eng.",
-    age: "4d ago",
-    sla: "Verified Cleared",
-    slaLabel: "",
-    slaClass: "cleared",
-    resolved: true,
-  },
-  {
-    id: "CP-2026-004827",
-    title: "Fallen tree branch blocking bike lane",
-    detail: "Cleared and mulched on site • Pathway opened",
-    category: "Parks & Forestry",
-    icon: "park",
-    categoryClass: "parks",
-    location: "South Greenway Trail",
-    priority: "LOW",
-    status: "RESOLVED",
-    statusClass: "resolved",
-    assignee: "Field B Crew",
-    initials: "FB",
-    department: "Parks Dept",
-    age: "5d ago",
-    sla: "Verified Cleared",
-    slaLabel: "",
-    slaClass: "cleared",
-    resolved: true,
-  },
-];
+// Map backend Category enum -> UI icon + chip class.
+const CATEGORY_META = {
+  "Street Light": { icon: "lightbulb", class: "streetlight" },
+  "Pothole": { icon: "commute", class: "road" },
+  "Water / Drainage": { icon: "water_drop", class: "water" },
+  "Garbage / Sanitation": { icon: "delete", class: "garbage" },
+  "Noise": { icon: "graphic_eq", class: "safety" },
+  "Graffiti": { icon: "format_paint", class: "parks" },
+  "Traffic Signal": { icon: "traffic", class: "road" },
+  "Parks / Trees": { icon: "park", class: "parks" },
+  "Other": { icon: "more_horiz", class: "safety" },
+};
+
+// Map backend Status -> chip class + display label.
+const STATUS_META = {
+  "New": { class: "new", label: "NEW" },
+  "Assigned": { class: "assigned", label: "ASSIGNED" },
+  "In Progress": { class: "progress", label: "IN PROGRESS" },
+  "Resolved": { class: "resolved", label: "RESOLVED" },
+  "Reopened": { class: "new", label: "REOPENED" },
+};
+
+const PAGE_SIZE = 25;
 
 function Icon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
 }
 
+function initials(name) {
+  if (!name) return "--";
+  return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function ageFrom(dt) {
+  if (!dt) return "";
+  const diff = Date.now() - new Date(dt).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days >= 1) return `${days}d ago`;
+  const hours = Math.floor(diff / 3600000);
+  if (hours >= 1) return `${hours}h ago`;
+  return `${Math.max(1, Math.floor(diff / 60000))}m ago`;
+}
+
+// Compute an SLA countdown chip from sla_due_at + status.
+function slaChip(complaint) {
+  if (complaint.status === "Resolved") {
+    return { sla: "Verified Cleared", slaLabel: "", slaClass: "cleared" };
+  }
+  const due = complaint.sla_due_at ? new Date(complaint.sla_due_at).getTime() : null;
+  if (!due) return { sla: "No SLA", slaLabel: "", slaClass: "on-track" };
+  const ms = due - Date.now();
+  if (ms <= 0) return { sla: "Overdue", slaLabel: "BREACHED", slaClass: "critical" };
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const label = `${String(hrs).padStart(2, "0")}h ${String(mins).padStart(2, "0")}m`;
+  if (hrs < 8) return { sla: label, slaLabel: "APPROACHING", slaClass: "approaching" };
+  return { sla: label, slaLabel: "ON TRACK", slaClass: "on-track" };
+}
+
+// Adapt a backend complaint document into the shape this table renders.
+function toRow(c) {
+  const cat = CATEGORY_META[c.category] || CATEGORY_META.Other;
+  const st = STATUS_META[c.status] || { class: "new", label: c.status?.toUpperCase() };
+  const loc = c.location || {};
+  return {
+    id: c.id,
+    ticket: c.ticket_id,
+    title: c.description,
+    detail: `${c.category} • ${c.reporter_name || "Citizen"}`,
+    category: c.category,
+    icon: cat.icon,
+    categoryClass: cat.class,
+    location: loc.address || (loc.lat != null ? `${loc.lat.toFixed(3)}, ${loc.lng.toFixed(3)}` : "—"),
+    priority: c.priority,
+    status: st.label,
+    statusClass: st.class,
+    assignee: c.assigned_to || "Unassigned",
+    initials: initials(c.assigned_to),
+    department: c.department || "—",
+    age: ageFrom(c.created_at),
+    critical: c.priority === "CRITICAL",
+    resolved: c.status === "Resolved",
+    ...slaChip(c),
+  };
+}
+
+const STATUS_OPTIONS = ["All Active", "New", "Assigned", "In Progress", "Resolved", "Reopened"];
+const CATEGORY_OPTIONS = ["All Categories", ...Object.keys(CATEGORY_META)];
+const PRIORITY_OPTIONS = ["All Levels", "CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
 export default function ComplaintQueue() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selected, setSelected] = useState([]);
   const [status, setStatus] = useState("All Active");
   const [category, setCategory] = useState("All Categories");
   const [priority, setPriority] = useState("All Levels");
-  const [department, setDepartment] = useState("Ward 4 Divisions");
-  const [sla, setSla] = useState("Near Breach (14)");
-  const [dateRange, setDateRange] = useState("Last 7 Days");
   const [view, setView] = useState("table");
+  const [page, setPage] = useState(1);
   const [toast, setToast] = useState("");
+
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
 
   const showToast = (message) => {
     setToast(message);
@@ -164,119 +120,101 @@ export default function ComplaintQueue() {
     showToast.timer = window.setTimeout(() => setToast(""), 2200);
   };
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  // Debounce the search box.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 400);
+    return () => clearTimeout(t);
+  }, [query]);
 
-    return COMPLAINTS.filter((item) => {
-      const matchesQuery =
-        !q ||
-        Object.values(item).some((value) =>
-          String(value).toLowerCase().includes(q)
-        );
+  // Reset to page 1 whenever a filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, status, category, priority]);
 
-      const matchesStatus =
-        status === "All Active" ||
-        item.status === status.toUpperCase();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {
+        status: status === "All Active" ? undefined : status,
+        category: category === "All Categories" ? undefined : category,
+        priority: priority === "All Levels" ? undefined : priority,
+        q: debouncedQuery || undefined,
+        page,
+        page_size: PAGE_SIZE,
+      };
+      const res = await adminService.listComplaints(params);
+      setRows((res.items || []).map(toRow));
+      setTotal(res.total || 0);
+    } catch (err) {
+      showToast(err?.message || "Could not load complaints.");
+      setRows([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [status, category, priority, debouncedQuery, page]);
 
-      const matchesCategory =
-        category === "All Categories" || item.category === category;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-      const matchesPriority =
-        priority === "All Levels" || item.priority === priority;
+  useEffect(() => {
+    analyticsService.dashboardStats().then(setStats).catch(() => {});
+  }, []);
 
-      const matchesDepartment =
-        department === "Ward 4 Divisions" ||
-        item.department === department;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startIndex = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(page * PAGE_SIZE, total);
 
-      const matchesSla =
-        sla === "Near Breach (14)"
-          ? true
-          : sla === "All SLA"
-            ? true
-            : item.slaLabel === sla;
-
-      const matchesDate =
-        dateRange === "Last 7 Days" ? true : true;
-
-      return (
-        matchesQuery &&
-        matchesStatus &&
-        matchesCategory &&
-        matchesPriority &&
-        matchesDepartment &&
-        matchesSla &&
-        matchesDate
-      );
-    });
-  }, [query, status, category, priority, department, sla, dateRange]);
-
-  const allSelected =
-    filtered.length > 0 && filtered.every((item) => selected.includes(item.id));
+  const allSelected = rows.length > 0 && rows.every((item) => selected.includes(item.id));
 
   const toggleAll = () => {
     if (allSelected) {
-      setSelected((current) =>
-        current.filter((id) => !filtered.some((item) => item.id === id))
-      );
+      setSelected((current) => current.filter((id) => !rows.some((item) => item.id === id)));
     } else {
-      setSelected((current) => [
-        ...new Set([...current, ...filtered.map((item) => item.id)]),
-      ]);
+      setSelected((current) => [...new Set([...current, ...rows.map((item) => item.id)])]);
     }
   };
 
-  const toggleSelected = (id) => {
+  const toggleSelected = (id) =>
     setSelected((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
     );
-  };
 
   const resetFilters = () => {
     setQuery("");
     setStatus("All Active");
     setCategory("All Categories");
     setPriority("All Levels");
-    setDepartment("Ward 4 Divisions");
-    setSla("Near Breach (14)");
-    setDateRange("Last 7 Days");
     showToast("Filters reset");
   };
 
+  const bulkAssign = async () => {
+    if (selected.length === 0) {
+      showToast("Select at least one ticket first.");
+      return;
+    }
+    const assignee = window.prompt("Assign selected tickets to:");
+    if (!assignee) return;
+    try {
+      await adminService.bulkAssign(selected, assignee);
+      showToast(`${selected.length} ticket(s) assigned to ${assignee}`);
+      setSelected([]);
+      load();
+    } catch (err) {
+      showToast(err?.message || "Bulk assign failed.");
+    }
+  };
+
   const exportCsv = () => {
-    const headers = [
-      "Ticket ID",
-      "Issue",
-      "Category",
-      "Location",
-      "Priority",
-      "Status",
-      "Assignee",
-      "Department",
-      "Age",
-      "SLA",
-    ];
-
-    const rows = filtered.map((item) => [
-      item.id,
-      item.title,
-      item.category,
-      item.location,
-      item.priority,
-      item.status,
-      item.assignee,
-      item.department,
-      item.age,
-      `${item.sla} ${item.slaLabel}`,
+    const headers = ["Ticket ID", "Issue", "Category", "Location", "Priority", "Status", "Assignee", "Department", "Age", "SLA"];
+    const data = rows.map((item) => [
+      item.ticket, item.title, item.category, item.location, item.priority,
+      item.status, item.assignee, item.department, item.age, `${item.sla} ${item.slaLabel}`,
     ]);
-
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")
-      )
+    const csv = [headers, ...data]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
       .join("\n");
-
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -287,12 +225,16 @@ export default function ComplaintQueue() {
     showToast("Complaint queue exported");
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/auth/login");
+  };
+
+  const openCount = stats ? stats.total - stats.resolved : null;
+
   return (
     <>
-      <AdminSidebar
-        activeKey="complaints"
-        onLogout={() => showToast("Sign out action selected.")}
-      />
+      <AdminSidebar activeKey="complaints" user={user} onLogout={handleLogout} />
 
       <div className="cp-queue-shell">
         <header className="cp-queue-header">
@@ -300,7 +242,7 @@ export default function ComplaintQueue() {
             <Icon className="cp-queue-console-icon">tune</Icon>
             <span>Municipal Console</span>
             <span className="cp-queue-slash">/</span>
-            <strong>Ward 4 Central Operations</strong>
+            <strong>Central Operations</strong>
           </div>
 
           <div className="cp-queue-global-search">
@@ -314,21 +256,18 @@ export default function ComplaintQueue() {
               <span />
               <span>Dispatch Pipes Online</span>
             </div>
-
             <div className="cp-queue-divider" />
-
             <button className="cp-queue-icon-button" type="button">
               <Icon>notifications</Icon>
               <b>3</b>
             </button>
-
             <div className="cp-queue-profile">
               <div className="cp-queue-profile-avatar">
                 <Icon>person</Icon>
               </div>
               <div>
-                <strong>Rahul Sharma</strong>
-                <span>Senior Dispatcher</span>
+                <strong>{user?.name || "Municipal User"}</strong>
+                <span>{user?.role ? user.role[0].toUpperCase() + user.role.slice(1) : "Staff"}</span>
               </div>
             </div>
           </div>
@@ -349,17 +288,17 @@ export default function ComplaintQueue() {
                 <div>
                   <i className="active" />
                   <span>Active Tickets:</span>
-                  <strong>684</strong>
+                  <strong>{openCount ?? "—"}</strong>
                 </div>
                 <div>
                   <i className="critical pulse" />
                   <span>Critical:</span>
-                  <strong>27</strong>
+                  <strong>{stats?.critical ?? "—"}</strong>
                 </div>
                 <div>
                   <i className="amber" />
-                  <span>Approaching SLA:</span>
-                  <strong>14</strong>
+                  <span>Overdue:</span>
+                  <strong>{stats?.overdue ?? "—"}</strong>
                 </div>
               </div>
             </section>
@@ -372,7 +311,7 @@ export default function ComplaintQueue() {
                     id="ticket-search"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search complaints by ID, resident, street, or keyword (CP-2026-...)"
+                    placeholder="Search complaints by ID, resident, street, or keyword (CP-...)"
                   />
                   {query && (
                     <button type="button" onClick={() => setQuery("")}>
@@ -383,27 +322,19 @@ export default function ComplaintQueue() {
 
                 <div className="cp-queue-actions">
                   <div className="cp-queue-view-toggle">
-                    <button
-                      className={view === "table" ? "selected" : ""}
-                      type="button"
-                      onClick={() => setView("table")}
-                    >
+                    <button className={view === "table" ? "selected" : ""} type="button" onClick={() => setView("table")}>
                       <Icon>view_list</Icon>
                       <span>Table</span>
                     </button>
-                    <button
-                      className={view === "board" ? "selected" : ""}
-                      type="button"
-                      onClick={() => setView("board")}
-                    >
+                    <button className={view === "board" ? "selected" : ""} type="button" onClick={() => setView("board")}>
                       <Icon>view_kanban</Icon>
                       <span>Board</span>
                     </button>
                   </div>
 
-                  <button type="button" onClick={() => showToast(`${selected.length} ticket(s) selected for bulk assignment`)}>
+                  <button type="button" onClick={bulkAssign}>
                     <Icon>group_add</Icon>
-                    <span>Bulk Assign</span>
+                    <span>Bulk Assign{selected.length ? ` (${selected.length})` : ""}</span>
                   </button>
 
                   <button type="button" onClick={exportCsv}>
@@ -411,55 +342,18 @@ export default function ComplaintQueue() {
                     <span>Export CSV</span>
                   </button>
 
-                  <button className="fast-dispatch" type="button" onClick={() => showToast("Fast dispatch queue opened")}>
+                  <button className="fast-dispatch" type="button" onClick={() => navigate("/admin/map")}>
                     <Icon>send_time_extension</Icon>
-                    <span>Fast Dispatch</span>
+                    <span>City Map</span>
                   </button>
                 </div>
               </div>
 
               <div className="cp-queue-filters">
                 <span className="filter-label">Filters:</span>
-
-                <Filter
-                  label="Status:"
-                  value={status}
-                  options={["All Active", "New", "Assigned", "In Progress", "Resolved"]}
-                  onChange={setStatus}
-                />
-                <Filter
-                  label="Category:"
-                  value={category}
-                  options={["All Categories", "Streetlight", "Water", "Garbage", "Road & Transit", "Safety Hazard", "Parks & Forestry"]}
-                  onChange={setCategory}
-                />
-                <Filter
-                  label="Priority:"
-                  value={priority}
-                  options={["All Levels", "CRITICAL", "HIGH", "MEDIUM", "LOW"]}
-                  onChange={setPriority}
-                />
-                <Filter
-                  label="Department:"
-                  value={department}
-                  options={["Ward 4 Divisions", "Electrical Maint.", "Water Resources", "Sanitation Dept", "Public Works", "Civil Infra", "Traffic Eng.", "Parks Dept"]}
-                  onChange={setDepartment}
-                />
-                <Filter
-                  label="SLA:"
-                  value={sla}
-                  options={["Near Breach (14)", "All SLA", "APPROACHING", "ON TRACK", "CRITICAL SLA"]}
-                  onChange={setSla}
-                  accent
-                />
-                <Filter
-                  label=""
-                  value={dateRange}
-                  options={["Last 7 Days", "Last 30 Days", "Today"]}
-                  onChange={setDateRange}
-                  icon="calendar_today"
-                />
-
+                <Filter label="Status:" value={status} options={STATUS_OPTIONS} onChange={setStatus} />
+                <Filter label="Category:" value={category} options={CATEGORY_OPTIONS} onChange={setCategory} />
+                <Filter label="Priority:" value={priority} options={PRIORITY_OPTIONS} onChange={setPriority} accent />
                 <button className="reset" type="button" onClick={resetFilters}>
                   <Icon>restart_alt</Icon>
                   <span>Reset</span>
@@ -474,11 +368,7 @@ export default function ComplaintQueue() {
                     <thead>
                       <tr>
                         <th className="check-col">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={toggleAll}
-                          />
+                          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
                         </th>
                         <th>Ticket ID</th>
                         <th>Issue Title & Details</th>
@@ -493,7 +383,7 @@ export default function ComplaintQueue() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((item) => (
+                      {rows.map((item) => (
                         <ComplaintRow
                           key={item.id}
                           item={item}
@@ -505,11 +395,17 @@ export default function ComplaintQueue() {
                     </tbody>
                   </table>
 
-                  {filtered.length === 0 && (
+                  {!loading && rows.length === 0 && (
                     <div className="cp-queue-empty">
                       <Icon>search_off</Icon>
                       <strong>No complaints found</strong>
                       <span>Try adjusting your search or filters.</span>
+                    </div>
+                  )}
+                  {loading && (
+                    <div className="cp-queue-empty">
+                      <Icon>hourglass_top</Icon>
+                      <strong>Loading complaints…</strong>
                     </div>
                   )}
                 </div>
@@ -517,32 +413,20 @@ export default function ComplaintQueue() {
                 <div className="cp-queue-pagination">
                   <div>
                     <span>
-                      Showing <strong>1-{filtered.length}</strong> of <strong>684</strong> complaints
+                      Showing <strong>{startIndex}-{endIndex}</strong> of <strong>{total}</strong> complaints
                     </span>
-                    <label>
-                      Rows per page:
-                      <select defaultValue="25">
-                        <option>10</option>
-                        <option>25</option>
-                        <option>50</option>
-                        <option>100</option>
-                      </select>
-                    </label>
                   </div>
 
                   <div className="pager">
-                    <button disabled type="button">
+                    <button disabled={page <= 1} type="button" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                       <Icon>chevron_left</Icon>
                       <span>Previous</span>
                     </button>
                     <div>
-                      <button className="current" type="button">1</button>
-                      <button type="button">2</button>
-                      <button type="button">3</button>
-                      <span>...</span>
-                      <button type="button">28</button>
+                      <button className="current" type="button">{page}</button>
+                      <span>of {totalPages}</span>
                     </div>
-                    <button type="button">
+                    <button disabled={page >= totalPages} type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                       <span>Next</span>
                       <Icon>chevron_right</Icon>
                     </button>
@@ -550,20 +434,8 @@ export default function ComplaintQueue() {
                 </div>
               </section>
             ) : (
-              <BoardView complaints={filtered} />
+              <BoardView complaints={rows} />
             )}
-
-            <section className="cp-queue-snapshot">
-              <Snapshot icon="bolt" title="Auto-Triage Active">
-                42 tickets routed via CivicSense automated ML engine
-              </Snapshot>
-              <Snapshot icon="speed" title="Mean SLA Velocity" tone="amber">
-                Current: 4h 12m (Ward 4 average is -18m below ceiling)
-              </Snapshot>
-              <Snapshot icon="task" title="Daily Clearance Rate" tone="green">
-                94.2% resolution efficiency across municipal departments
-              </Snapshot>
-            </section>
           </div>
         </main>
 
@@ -596,8 +468,8 @@ function ComplaintRow({ item, selected, onSelect, onToast }) {
       </td>
       <td>
         <div className="queue-id">
-          <span>{item.id}</span>
-          <button type="button" title="Copy ID" onClick={() => navigator.clipboard?.writeText(item.id).then(() => onToast("Ticket ID copied"))}>
+          <span>{item.ticket}</span>
+          <button type="button" title="Copy ID" onClick={() => navigator.clipboard?.writeText(item.ticket).then(() => onToast("Ticket ID copied"))}>
             <Icon>content_copy</Icon>
           </button>
         </div>
@@ -643,21 +515,15 @@ function ComplaintRow({ item, selected, onSelect, onToast }) {
       </td>
       <td>
         <span className={`sla-chip ${item.slaClass}`}>
-          <Icon>{item.slaLabel === "CRITICAL SLA" ? "timer_off" : item.slaLabel === "Verified Cleared" ? "task_alt" : "alarm"}</Icon>
+          <Icon>{item.slaLabel === "BREACHED" ? "timer_off" : item.resolved ? "task_alt" : "alarm"}</Icon>
           <span>{item.sla}</span>
           {item.slaLabel && <b>{item.slaLabel}</b>}
         </span>
       </td>
       <td className="actions-col">
         <div className="row-actions">
-          {item.resolved ? (
-            <button type="button" onClick={() => onToast(`${item.id} archived`)}>Archive</button>
-          ) : item.critical && item.status === "NEW" ? (
-            <button className="dispatch" type="button" onClick={() => onToast(`Dispatch initiated for ${item.id}`)}>Dispatch Now</button>
-          ) : (
-            <Link to={`/admin/complaints/${item.id}`}>View</Link>
-          )}
-          <button type="button" onClick={() => onToast(`Actions opened for ${item.id}`)}>
+          <Link to={`/admin/complaints/${item.id}`}>View</Link>
+          <button type="button" onClick={() => onToast(`Ticket ${item.ticket}`)}>
             <Icon>more_vert</Icon>
           </button>
         </div>
@@ -680,26 +546,12 @@ function BoardView({ complaints }) {
             <Link key={item.id} to={`/admin/complaints/${item.id}`} className="board-card">
               <span>{item.priority}</span>
               <strong>{item.title}</strong>
-              <small>{item.id}</small>
+              <small>{item.ticket}</small>
               <small>{item.location}</small>
             </Link>
           ))}
         </div>
       ))}
     </section>
-  );
-}
-
-function Snapshot({ icon, title, tone = "", children }) {
-  return (
-    <div className={`cp-queue-snapshot-card ${tone}`}>
-      <div className="snapshot-icon">
-        <Icon>{icon}</Icon>
-      </div>
-      <div>
-        <strong>{title}</strong>
-        <p>{children}</p>
-      </div>
-    </div>
   );
 }

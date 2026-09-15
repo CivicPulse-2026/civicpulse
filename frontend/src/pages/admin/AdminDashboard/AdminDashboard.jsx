@@ -1,15 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../components/AdminSidebar/AdminSidebar";
+import { analyticsService } from "../../../lib/services";
+import { useAuth } from "../../../context/AuthContext";
 import "./AdminDashboard.css";
 
-const issues = [
-  { name: "Streetlight", value: 628, pct: "25.3%", tone: "primary" },
-  { name: "Water Resources", value: 512, pct: "20.6%", tone: "water" },
-  { name: "Road & Pavement", value: 489, pct: "19.7%", tone: "secondary" },
-  { name: "Garbage & Refuse", value: 342, pct: "13.8%", tone: "green" },
-  { name: "Sanitation & Drains", value: 294, pct: "11.9%", tone: "amber" },
-  { name: "Other Civic Utilities", value: 216, pct: "8.7%", tone: "outline" },
-];
+const DISTRIBUTION_TONES = ["primary", "water", "secondary", "green", "amber", "outline"];
 
 function Icon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -37,8 +33,14 @@ function KpiCard({ label, icon, value, change, footer, footerRight, tone = "prim
 }
 
 export default function AdminDashboard() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const [toast, setToast] = useState("");
-  const [mapMode, setMapMode] = useState("All (684)");
+  const [mapMode, setMapMode] = useState("All");
+  const [stats, setStats] = useState(null);
+  const [attention, setAttention] = useState([]);
+  const [distribution, setDistribution] = useState([]);
 
   const notify = (message) => {
     setToast(message);
@@ -46,12 +48,44 @@ export default function AdminDashboard() {
     window.__civicPulseToast = window.setTimeout(() => setToast(""), 2200);
   };
 
+  useEffect(() => {
+    let active = true;
+
+    analyticsService.dashboardStats().then((s) => active && setStats(s)).catch(() => {});
+    analyticsService.attention().then((a) => active && setAttention(a.items || [])).catch(() => {});
+    analyticsService
+      .distribution()
+      .then((d) => {
+        if (!active) return;
+        const byCategory = d.by_category || {};
+        const total = Object.values(byCategory).reduce((sum, n) => sum + n, 0) || 1;
+        const rows = Object.entries(byCategory)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, value], i) => ({
+            name,
+            value,
+            pct: `${((value / total) * 100).toFixed(1)}%`,
+            tone: DISTRIBUTION_TONES[i % DISTRIBUTION_TONES.length],
+          }));
+        setDistribution(rows);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/auth/login");
+  };
+
+  const fmtNum = (n) => (n == null ? "—" : n.toLocaleString());
+
   return (
     <div className="cp-admin-dashboard">
-      <AdminSidebar
-        activeKey="dashboard"
-        onLogout={() => notify("Sign out action selected")}
-      />
+      <AdminSidebar activeKey="dashboard" user={user} onLogout={handleLogout} />
 
       <div className="cp-admin-shell">
         <header className="cp-admin-topbar">
@@ -86,8 +120,8 @@ export default function AdminDashboard() {
             <div className="cp-top-user">
               <div className="cp-top-avatar"><Icon>person</Icon></div>
               <div>
-                <span>Rahul Sharma</span>
-                <small>Senior Dispatcher</small>
+                <span>{user?.name || "Municipal User"}</span>
+                <small>{user?.role ? user.role[0].toUpperCase() + user.role.slice(1) : "Staff"}</small>
               </div>
             </div>
           </div>
@@ -122,11 +156,11 @@ export default function AdminDashboard() {
             </section>
 
             <section className="cp-kpi-grid">
-              <KpiCard label="Total Complaints" icon="stacked_line_chart" value="2,481" change="+12.4%" footer="vs. last month" tone="primary" />
-              <KpiCard label="Open Issues" icon="pending_actions" value="684" change="-4.2%" footer="Active workload" footerRight="27.5% ratio" tone="primary-container" />
-              <KpiCard label="Resolved" icon="task_alt" value="1,797" change="+18.7%" footer="Resolution pace" footerRight="Clearance high" tone="secondary" />
-              <KpiCard label="SLA Compliance" icon="verified" value="91.4%" change="+3.1%" footer="Target >90.0%" footerRight="On Target" tone="primary" />
-              <KpiCard label="Critical Issues" icon="priority_high" value="27" change="+5 urgent" footer="Immediate dispatch" footerRight="Action needed" tone="error" critical />
+              <KpiCard label="Total Complaints" icon="stacked_line_chart" value={fmtNum(stats?.total)} change="" footer="All time" tone="primary" />
+              <KpiCard label="Open Issues" icon="pending_actions" value={fmtNum(stats ? stats.total - stats.resolved : null)} change="" footer="Active workload" footerRight={`${stats?.in_progress ?? 0} in progress`} tone="primary-container" />
+              <KpiCard label="Resolved" icon="task_alt" value={fmtNum(stats?.resolved)} change="" footer="Resolution pace" footerRight={`${stats?.resolution_rate ?? 0}% rate`} tone="secondary" />
+              <KpiCard label="Overdue (SLA)" icon="verified" value={fmtNum(stats?.overdue)} change="" footer="Past SLA due" footerRight={stats && stats.overdue === 0 ? "On target" : "Action needed"} tone="primary" />
+              <KpiCard label="Critical Issues" icon="priority_high" value={fmtNum(stats?.critical)} change="" footer="Immediate dispatch" footerRight="Action needed" tone="error" critical />
             </section>
 
             <section className="cp-spatial-grid">
@@ -146,7 +180,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="map-tabs">
-                    {["All (684)", "Critical Only", "Clusters", "Service Fleet"].map((mode) => (
+                    {["All", "Critical Only", "Clusters", "Service Fleet"].map((mode) => (
                       <button
                         key={mode}
                         className={mapMode === mode ? "active" : ""}
@@ -269,63 +303,50 @@ export default function AdminDashboard() {
                 <div>
                   <div className="attention-header">
                     <div>
-                      <h2>Needs Attention <span>3 Urgent</span></h2>
+                      <h2>Needs Attention <span>{attention.length} items</span></h2>
                     </div>
-                    <button onClick={() => notify("Attention queue filter opened")}><Icon>tune</Icon></button>
+                    <button onClick={() => navigate("/admin/complaints")}><Icon>tune</Icon></button>
                   </div>
 
                   <div className="attention-stack">
-                    <AttentionItem
-                      status="CRITICAL"
-                      id="#WR-1049"
-                      timer="06h 12m left"
-                      timerIcon="alarm"
-                      title="Ward 12 Water Supply Outage"
-                      description="18 complaints (Cluster) • 2 days old • Pipeline rupture near Sector Market"
-                      team="Water Resources Bureau"
-                      teamIcon="engineering"
-                      action="Dispatch"
-                      critical
-                      onAction={() => notify("Dispatch opened for #WR-1049")}
-                    />
-                    <AttentionItem
-                      status="BREACHED"
-                      id="#RD-4402"
-                      timer="-1h 15m (Overdue)"
-                      timerIcon="warning"
-                      title="Central Market Road Damage"
-                      description="11 complaints • HIGH Priority • 9 days old • Deep cavity impeding arterial traffic"
-                      team="Public Works / Asphalt Crew B"
-                      teamIcon="group"
-                      action="Reassign"
-                      breached
-                      onAction={() => notify("Reassignment opened for #RD-4402")}
-                    />
-                    <AttentionItem
-                      status="HIGH"
-                      id="#EL-8120"
-                      timer="08h 42m SLA"
-                      timerIcon="timer"
-                      title="Gate 3 Streetlight Outage"
-                      description="9 related complaints • 6 days old • Dark corridor risk along perimeter schools"
-                      team="Electrical Maint. Div 4 (Team 04)"
-                      teamIcon="bolt"
-                      action="Details"
-                      high
-                      onAction={() => notify("Details opened for #EL-8120")}
-                    />
+                    {attention.length === 0 && (
+                      <p style={{ color: "var(--on-surface-variant)", fontSize: 14, padding: "12px 0" }}>
+                        No items need attention right now.
+                      </p>
+                    )}
+                    {attention.map((item) => {
+                      const critical = item.priority === "CRITICAL";
+                      const high = item.priority === "HIGH";
+                      return (
+                        <AttentionItem
+                          key={item.id}
+                          status={item.priority}
+                          id={`#${item.ticket_id}`}
+                          timer={item.sla_due_at ? new Date(item.sla_due_at).toLocaleDateString() : "No SLA"}
+                          timerIcon={critical ? "alarm" : "timer"}
+                          title={item.category}
+                          description={item.description}
+                          team={item.department || "Unassigned"}
+                          teamIcon="engineering"
+                          action="Details"
+                          critical={critical}
+                          high={high}
+                          onAction={() => navigate(`/admin/complaints/${item.id}`)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
-                <button className="attention-footer" onClick={() => notify("Showing all 27 critical items")}>
-                  <span>View all 27 critical items</span>
+                <button className="attention-footer" onClick={() => navigate("/admin/complaints")}>
+                  <span>View all complaints</span>
                   <Icon>arrow_forward</Icon>
                 </button>
               </div>
             </section>
 
             <section className="cp-analytics-grid">
-              <IssueDistribution issues={issues} />
+              <IssueDistribution issues={distribution} total={stats?.total} />
               <AgingComplaints />
               <SlaPerformance />
             </section>
@@ -360,14 +381,18 @@ function AttentionItem({ status, id, timer, timerIcon, title, description, team,
   );
 }
 
-function IssueDistribution({ issues }) {
+function IssueDistribution({ issues, total }) {
+  const leading = issues[0]?.name || "—";
   return (
     <div className="analytics-card">
       <div className="analytics-card-heading">
         <div><h3>Issue Distribution</h3><p>Active volume by civic sector</p></div>
-        <strong>2,481 Total</strong>
+        <strong>{total != null ? `${total.toLocaleString()} Total` : "—"}</strong>
       </div>
       <div className="distribution-list">
+        {issues.length === 0 && (
+          <p style={{ color: "var(--on-surface-variant)", fontSize: 13 }}>No data yet.</p>
+        )}
         {issues.map((issue) => (
           <div key={issue.name} className="distribution-row">
             <div><span>{issue.name}</span><strong>{issue.value} ({issue.pct})</strong></div>
@@ -375,7 +400,7 @@ function IssueDistribution({ issues }) {
           </div>
         ))}
       </div>
-      <div className="analytics-footer"><span>Leading category: <strong>Streetlight</strong></span><span className="secondary-text">+4.2% shift wk/wk</span></div>
+      <div className="analytics-footer"><span>Leading category: <strong>{leading}</strong></span></div>
     </div>
   );
 }

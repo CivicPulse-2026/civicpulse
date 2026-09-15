@@ -1934,3 +1934,19 @@
     max-width: 70%;
   }
 }
+
+/* Interactive "Use my location" button (reuses accuracy pill styling) */
+.report-locate-btn {
+  border: none;
+  cursor: pointer;
+  background: var(--surface-container);
+  color: var(--primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.report-locate-btn:hover {
+  background: var(--surface-high);
+}

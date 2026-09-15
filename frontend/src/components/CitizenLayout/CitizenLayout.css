@@ -1,0 +1,304 @@
+.cp-cz-page {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--on-surface);
+  font-family: "Geist", system-ui, sans-serif;
+}
+
+/* ---- Sidebar ---- */
+.cp-cz-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--surface-container);
+  padding: 20px 16px;
+  z-index: 30;
+}
+
+.cp-cz-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 20px;
+}
+
+.cp-cz-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--primary-container);
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.cp-cz-brand strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cp-cz-brand small {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.cp-cz-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.cp-cz-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 550;
+  transition: 0.15s;
+}
+
+.cp-cz-nav-item:hover {
+  background: var(--surface-low);
+  color: var(--on-surface);
+}
+
+.cp-cz-nav-item.active {
+  background: var(--surface-high);
+  color: var(--primary);
+  font-weight: 650;
+}
+
+.cp-cz-nav-item .material-symbols-outlined {
+  font-size: 21px;
+}
+
+.cp-cz-sidebar-foot {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--surface-container);
+}
+
+.cp-cz-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px 12px;
+}
+
+.cp-cz-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--secondary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.cp-cz-user-meta strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-cz-user-meta small {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.cp-cz-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-container);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.cp-cz-logout:hover {
+  background: #ffebee;
+  border-color: #ffcdd2;
+  color: var(--error);
+}
+
+.cp-cz-logout .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* ---- Content shell ---- */
+.cp-cz-shell {
+  margin-left: 256px;
+  min-height: 100vh;
+}
+
+.cp-cz-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface-container);
+}
+
+.cp-cz-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cp-cz-header p {
+  margin: 6px 0 0;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+}
+
+.cp-cz-header-actions {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.cp-cz-main {
+  padding: 28px 32px 48px;
+  max-width: 1120px;
+}
+
+/* ---- Shared primitives used by citizen pages ---- */
+.cp-cz-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.18s;
+  text-decoration: none;
+}
+
+.cp-cz-btn-primary {
+  background: var(--primary-container);
+  color: #fff;
+}
+
+.cp-cz-btn-primary:hover {
+  background: var(--primary);
+  transform: translateY(-1px);
+}
+
+.cp-cz-btn-ghost {
+  background: var(--surface-low);
+  color: var(--on-surface);
+}
+
+.cp-cz-btn-ghost:hover {
+  background: var(--surface-container);
+}
+
+.cp-cz-btn .material-symbols-outlined {
+  font-size: 19px;
+}
+
+.cp-cz-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-container);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+/* Status + priority pills reused across pages */
+.cp-cz-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.cp-cz-st-new { background: #e2e7ff; color: #00288e; }
+.cp-cz-st-assigned { background: #fff2d6; color: #8a5a00; }
+.cp-cz-st-inprogress { background: #dcefff; color: #0b5788; }
+.cp-cz-st-resolved { background: #d7f5e6; color: #0a6b40; }
+.cp-cz-st-reopened { background: #ffe0e0; color: #93000a; }
+
+.cp-cz-pr-critical { background: #ffdad6; color: #93000a; }
+.cp-cz-pr-high { background: #ffe8cc; color: #8a4b00; }
+.cp-cz-pr-medium { background: #e2e7ff; color: #1e40af; }
+.cp-cz-pr-low { background: var(--surface-container); color: var(--on-surface-variant); }
+
+/* Loading / empty states */
+.cp-cz-state {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--on-surface-variant);
+}
+
+.cp-cz-state .material-symbols-outlined {
+  font-size: 40px;
+  color: var(--outline);
+}
+
+@media (max-width: 900px) {
+  .cp-cz-sidebar {
+    width: 72px;
+    padding: 16px 10px;
+  }
+  .cp-cz-brand small,
+  .cp-cz-brand strong,
+  .cp-cz-nav-item span,
+  .cp-cz-user-meta,
+  .cp-cz-logout span {
+    display: none;
+  }
+  .cp-cz-nav-item,
+  .cp-cz-logout {
+    justify-content: center;
+  }
+  .cp-cz-shell {
+    margin-left: 72px;
+  }
+  .cp-cz-header,
+  .cp-cz-main {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}

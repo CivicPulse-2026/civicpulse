@@ -19,3 +19,18 @@
 @media(max-width:1023px){.cp-gis-shell{margin-left:72px}.cp-gis-header{left:72px;padding:0 16px}.cp-gis-header-context strong,.cp-gis-header-context b,.cp-gis-header-context span:not(.material-symbols-outlined){display:none}.cp-gis-global-search{max-width:390px}.cp-gis-command{padding:14px 16px}.cp-gis-cluster-card{left:350px}.cp-gis-inspector{width:350px}.cp-gis-legend{right:16px}.cp-gis-workspace{min-height:650px}}
 @media(max-width:850px){.cp-gis-cluster-card{display:none}.cp-gis-global-search{display:none}.cp-gis-command{display:block}.cp-gis-command-actions{max-width:none;justify-content:flex-start;margin-top:10px}.cp-gis-inspector{width:340px}.cp-gis-left-panel{width:300px}}
 @media(max-width:650px){.cp-gis-profile>div:last-child{display:none}.cp-gis-command-actions .cp-gis-stat:nth-child(2),.cp-gis-command-actions button:not(.primary){display:none}.cp-gis-left-panel{width:calc(100% - 32px)}.cp-gis-inspector{top:auto;bottom:16px;right:16px;max-height:58%;width:calc(100% - 32px)}.cp-gis-legend{bottom:16px;left:16px;right:16px;gap:10px}.cp-gis-map-controls{bottom:80px}.cp-gis-title-row h1{font-size:20px}}
+
+/* Real MapLibre basemap fills the workspace, sitting under the overlay panels.
+   Re-enable selection/touch here since the workspace disables user-select. */
+.cp-gis-maplibre{position:absolute;inset:0;width:100%;height:100%;user-select:none;-webkit-user-select:none;touch-action:none;cursor:grab}
+.cp-gis-maplibre:active{cursor:grabbing}
+.cp-gis-maplibre .maplibregl-canvas{outline:none}
+.cp-gis-maplibre .maplibregl-ctrl-attrib{font:10px Geist;background:rgba(255,255,255,.7)}
+.cp-gis-maplibre .maplibregl-ctrl-bottom-right{z-index:15}
+/* Live refresh indicator */
+.cp-gis-live{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border-radius:999px;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);box-shadow:0 5px 18px rgba(19,27,46,.11);font:600 11px Geist;color:#444653}
+.cp-gis-live-dot{width:8px;height:8px;border-radius:50%;background:#006a61;box-shadow:0 0 0 3px rgba(0,106,97,.14);animation:gisPing 1.8s infinite}
+.cp-gis-live button{display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:50%;background:#f2f3ff;color:#00288e;cursor:pointer}
+.cp-gis-live button:hover{background:#e2e7ff}
+.cp-gis-live button .material-symbols-outlined{font-size:16px}
+@media(max-width:850px){.cp-gis-live{top:auto;bottom:74px}}
