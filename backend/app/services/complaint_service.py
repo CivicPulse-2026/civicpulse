@@ -25,11 +25,19 @@ def as_utc(dt):
 def serialize(doc: dict) -> dict:
     if not doc:
         return doc
+
     out = dict(doc)
+
     out["id"] = str(out.pop("_id"))
+
+    # Embeddings are internal backend data.
+    # Do not expose them through the API.
+    out.pop("embedding", None)
+
     for key, value in list(out.items()):
-        if hasattr(value, "generation_time"):  # ObjectId
+        if hasattr(value, "generation_time"):
             out[key] = str(value)
+
     return out
 
 

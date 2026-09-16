@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import close_mongo_connection, connect_to_mongo
-from app.routers import admin, analytics, auth, complaints, public
+from app.routers import admin, analytics, auth, complaints, clusters, public
 from app.routers import map as map_router
 
 
@@ -40,6 +40,7 @@ API_PREFIX = "/api"
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(public.router, prefix=API_PREFIX)
 app.include_router(complaints.router, prefix=API_PREFIX)
+app.include_router(clusters.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
 app.include_router(map_router.router, prefix=API_PREFIX)

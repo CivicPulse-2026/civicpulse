@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from bson import ObjectId
@@ -10,7 +9,7 @@ from app.core.database import get_database
 from app.core.security import get_current_user
 from app.models.enums import Status
 from app.schemas.complaint import AnalyzeRequest, AnalyzeResponse
-from app.services.ai_analyzer import suggest_category
+from app.services.ai_analyzer import analyze_complaint
 from app.services.complaint_service import (
     build_priority,
     department_for,
@@ -19,6 +18,16 @@ from app.services.complaint_service import (
     serialize,
 )
 from app.services.priority_engine import score_complaint
+
+from app.services.similarity_service import (
+    find_similar_complaints,
+    generate_embedding,
+)
+
+from app.services.cluster_service import (
+    assign_complaint_to_cluster,
+)
+
 from app.services.storage import save_photo
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
@@ -40,10 +49,15 @@ async def _fetch(db, id_or_ticket: str) -> dict:
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(payload: AnalyzeRequest):
-    category = suggest_category(payload.description)
-    breakdown = score_complaint(category=category, description=payload.description)
+    ai_analysis = await analyze_complaint(payload.description)
+
+    breakdown = score_complaint(
+        category=ai_analysis.category,
+        description=payload.description,
+    )
+
     return AnalyzeResponse(
-        suggested_category=category,
+        ai_analysis=ai_analysis,
         priority=breakdown["priority"],
         priority_score=breakdown["score"],
         sla_hours=breakdown["sla_hours"],
@@ -62,19 +76,26 @@ async def create_complaint(
     ward: Optional[str] = Form(None),
     reporter_name: Optional[str] = Form(None),
     reporter_contact: Optional[str] = Form(None),
-    photos: list[UploadFile] = File(default=[]),
+    photos: list[UploadFile] | None = File(default=None),
     db=Depends(get_database),
 ):
     incoming = [p for p in (photos or []) if p.filename]
+
     if len(incoming) > settings.max_photos_per_complaint:
         raise HTTPException(
             status_code=400,
             detail=f"You can attach at most {settings.max_photos_per_complaint} photos.",
         )
 
+    # ---------------------------------------------------------
+    # 1. Save uploaded photos
+    # ---------------------------------------------------------
+
     saved: list[str] = []
+
     for photo in incoming:
         content_type = (photo.content_type or "").lower()
+
         if content_type not in settings.allowed_image_type_set:
             raise HTTPException(
                 status_code=400,
@@ -83,55 +104,270 @@ async def create_complaint(
                     f"Allowed: {', '.join(sorted(settings.allowed_image_type_set))}."
                 ),
             )
+
         data = await photo.read()
+
         if not data:
             continue
+
         if len(data) > settings.max_photo_bytes:
             raise HTTPException(
                 status_code=400,
-                detail=f"'{photo.filename}' exceeds the {settings.max_photo_mb:g} MB limit.",
+                detail=(
+                    f"'{photo.filename}' exceeds the "
+                    f"{settings.max_photo_mb:g} MB limit."
+                ),
             )
+
         saved.append(save_photo(data, photo.filename))
 
+    # ---------------------------------------------------------
+    # 2. Local AI analysis
+    # ---------------------------------------------------------
+
+    try:
+        ai_analysis = await analyze_complaint(description)
+    except Exception as exc:
+        # AI failure should never prevent complaint submission.
+        print(f"AI analysis failed: {exc}")
+        ai_analysis = None
+
+    # ---------------------------------------------------------
+    # 3. Use AI category when available
+    # ---------------------------------------------------------
+
+    final_category = category
+
+    if (
+        ai_analysis is not None
+        and ai_analysis.confidence > 0
+    ):
+        final_category = ai_analysis.category
+
+    # ---------------------------------------------------------
+    # 4. Generate local semantic embedding
+    # ---------------------------------------------------------
+
+    try:
+        embedding = generate_embedding(description)
+    except Exception as exc:
+        # Embedding failure should never prevent complaint submission.
+        print(f"Embedding generation failed: {exc}")
+        embedding = []
+
+
+    # ---------------------------------------------------------
+    # 5. Find similar existing complaints
+    # ---------------------------------------------------------
+
+    try:
+        similar_complaints = await find_similar_complaints(
+            db,
+            description=description,
+            lat=lat,
+            lng=lng,
+        )
+    except Exception as exc:
+        # Similarity failure should never prevent complaint submission.
+        print(f"Similarity detection failed: {exc}")
+        similar_complaints = []
+
+
+    duplicate_matches = [
+        item
+        for item in similar_complaints
+        if item["relationship"] == "DUPLICATE"
+    ]
+
+    related_matches = [
+        item
+        for item in similar_complaints
+        if item["relationship"] == "RELATED"
+    ]
+
+
+    # ---------------------------------------------------------
+    # 6. Rule-based priority
+    # ---------------------------------------------------------
+
     created = now()
+
     breakdown = await build_priority(
-        db, category=category, description=description, lat=lat, lng=lng, created_at=created
+        db,
+        category=final_category,
+        description=description,
+        lat=lat,
+        lng=lng,
+        created_at=created,
     )
+
     ticket_id = await generate_ticket_id(db)
+
     from datetime import timedelta
+
+    # ---------------------------------------------------------
+    # 7. Build complaint document
+    # ---------------------------------------------------------
 
     doc = {
         "ticket_id": ticket_id,
-        "category": category,
+
+        "category": final_category,
+
         "description": description,
+
         "status": Status.NEW.value,
+
+        # Final operational priority comes from rule engine.
         "priority": breakdown["priority"],
         "priority_score": breakdown["score"],
-        "department": department_for(category),
-        "location": {"lat": lat, "lng": lng, "address": address, "ward": ward},
+
+        "department": department_for(final_category),
+
+        "location": {
+            "lat": lat,
+            "lng": lng,
+            "address": address,
+            "ward": ward,
+        },
+
         "photos": saved,
+
         "reporter_name": reporter_name,
         "reporter_contact": reporter_contact,
+
         "assigned_to": None,
+
         "cluster_id": None,
-        "sla_due_at": created + timedelta(hours=breakdown["sla_hours"]),
+
+        # ---------------------------------------------------------
+        # Semantic similarity / duplicate detection
+        # ---------------------------------------------------------
+
+        "embedding": embedding,
+
+        "duplicate_status": (
+            "DUPLICATE"
+            if duplicate_matches
+            else "RELATED"
+            if related_matches
+            else "UNRELATED"
+        ),
+
+        "duplicate_of": (
+            duplicate_matches[0]["ticket_id"]
+            if duplicate_matches
+            else None
+        ),
+
+        "similarity_score": (
+            duplicate_matches[0]["similarity_score"]
+            if duplicate_matches
+            else (
+                related_matches[0]["similarity_score"]
+                if related_matches
+                else None
+            )
+        ),
+
+        "similarity_distance_m": (
+            duplicate_matches[0]["distance_m"]
+            if duplicate_matches
+            else (
+                related_matches[0]["distance_m"]
+                if related_matches
+                else None
+            )
+        ),
+
+        "similar_complaints": similar_complaints,
+
+        "sla_due_at": created + timedelta(
+            hours=breakdown["sla_hours"]
+        ),
+
         "similar_count": breakdown["similar_count"],
+
         "factors": breakdown["factors"],
+
+        # -----------------------------------------------------
+        # Local AI result
+        # -----------------------------------------------------
+
+        "ai_analysis": (
+            ai_analysis.model_dump()
+            if ai_analysis is not None
+            else None
+        ),
+
         "created_at": created,
         "updated_at": created,
         "resolved_at": None,
     }
+
+    # ---------------------------------------------------------
+    # 8. Insert into MongoDB
+    # ---------------------------------------------------------
+
     result = await db.complaints.insert_one(doc)
+
     doc["_id"] = result.inserted_id
+
+    # ---------------------------------------------------------
+    # 9. Assign complaint to a cluster
+    # ---------------------------------------------------------
+
+    cluster = None
+
+    if similar_complaints:
+        try:
+            cluster = await assign_complaint_to_cluster(
+                db,
+                complaint=doc,
+                similar_complaints=similar_complaints,
+            )
+
+            if cluster:
+                cluster_id = cluster["cluster_id"]
+
+                await db.complaints.update_one(
+                    {"_id": result.inserted_id},
+                    {
+                        "$set": {
+                            "cluster_id": cluster_id,
+                            "updated_at": now(),
+                        }
+                    },
+                )
+
+                doc["cluster_id"] = cluster_id
+
+        except Exception as exc:
+            # Clustering failure must never prevent complaint creation.
+            print(f"Clustering failed: {exc}")
+
+    # ---------------------------------------------------------
+    # 10. Audit event
+    # ---------------------------------------------------------
 
     await db.audit_events.insert_one({
         "complaint_id": str(result.inserted_id),
         "action": "created",
         "actor_name": reporter_name or "Citizen",
-        "detail": f"Complaint submitted (priority {breakdown['priority']}).",
+        "detail": (
+            f"Complaint submitted "
+            f"(priority {breakdown['priority']})."
+        ),
         "created_at": created,
     })
-    return {"complaint": serialize(doc)}
+
+    # ---------------------------------------------------------
+    # 11. Return complaint
+    # ---------------------------------------------------------
+
+    return {
+        "complaint": serialize(doc)
+    }
 
 
 @router.get("/mine/list")
