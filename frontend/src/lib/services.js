@@ -87,9 +87,28 @@ export const mapService = {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== "")
     ).toString();
+
     return api.get(`/admin/map/complaints${qs ? `?${qs}` : ""}`);
   },
+
   clusters: () => api.get("/admin/map/clusters"),
+
   fleet: () => api.get("/admin/map/fleet"),
+
   heatmap: () => api.get("/admin/map/heatmap"),
+
+  // NYC 311 reference data with pagination.
+  nyc311: (params = {}) => {
+    const query = {
+      limit: 1000,
+      offset: 0,
+      ...params,
+    };
+
+    const qs = new URLSearchParams(
+      Object.entries(query).filter(([, v]) => v != null && v !== "")
+    ).toString();
+
+    return api.get(`/admin/map/nyc-311?${qs}`);
+  },
 };

@@ -96,6 +96,24 @@ function fleetFC(fleet) {
   };
 }
 
+function nyc311FC(points) {
+  return {
+    type: "FeatureCollection",
+    features: points
+      .filter((p) => p.lat != null && p.lng != null)
+      .map((p) => ({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [p.lng, p.lat],
+        },
+        properties: {
+          ...p,
+        },
+      })),
+  };
+}
+
 // Fit the viewport to whatever data we have.
 function boundsOf(all) {
   const coords = all
@@ -108,7 +126,7 @@ function boundsOf(all) {
 }
 
 const MapLibreCanvas = forwardRef(function MapLibreCanvas(
-  { points, clusters, fleet, layers, onSelect },
+  { points, clusters, fleet, nyc311Points, layers, onSelect },
   ref
 ) {
   const containerRef = useRef(null);
@@ -164,6 +182,10 @@ const MapLibreCanvas = forwardRef(function MapLibreCanvas(
       map.addSource("breaches-src", { type: "geojson", data: pointsFC([]) });
       map.addSource("points-src", { type: "geojson", data: pointsFC([]) });
       map.addSource("fleet-src", { type: "geojson", data: fleetFC([]) });
+      map.addSource("nyc311-src", {
+        type: "geojson",
+        data: nyc311FC([]),
+      });
 
       // --- Heatmap layer ---
       map.addLayer({
@@ -264,6 +286,20 @@ const MapLibreCanvas = forwardRef(function MapLibreCanvas(
         },
       });
 
+      // --- NYC 311 reference data ---
+      map.addLayer({
+        id: "nyc311-layer",
+        type: "circle",
+        source: "nyc311-src",
+        paint: {
+          "circle-color": "#06b6d4",
+          "circle-radius": 3.5,
+          "circle-opacity": 0.65,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1,
+        },
+      });
+
       // Click a complaint marker -> open the inspector.
       const clickHandler = (e) => {
         const feat = e.features?.[0];
@@ -308,6 +344,7 @@ const MapLibreCanvas = forwardRef(function MapLibreCanvas(
     map.getSource("breaches-src")?.setData(breachesFC(points));
     map.getSource("clusters-src")?.setData(clustersFC(clusters));
     map.getSource("fleet-src")?.setData(fleetFC(fleet));
+    map.getSource("nyc311-src")?.setData(nyc311FC(nyc311Points));
 
     // Fit to data on first meaningful load.
     if (!didFitRef.current) {
@@ -321,8 +358,7 @@ const MapLibreCanvas = forwardRef(function MapLibreCanvas(
 
   useEffect(() => {
     syncData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, clusters, fleet]);
+  }, [points, clusters, fleet, nyc311Points]);
 
   // Toggle layer visibility from the parent's layers state.
   const syncVisibility = () => {
@@ -335,6 +371,11 @@ const MapLibreCanvas = forwardRef(function MapLibreCanvas(
       map.setLayoutProperty(id, "visibility", vis(layers.clusters));
     map.setLayoutProperty("breaches-layer", "visibility", vis(layers.breaches));
     map.setLayoutProperty("fleet-layer", "visibility", vis(layers.fleet));
+    map.setLayoutProperty(
+      "nyc311-layer",
+      "visibility",
+      vis(layers.nyc311)
+    );
   };
 
   useEffect(() => {

@@ -26,20 +26,43 @@ export default function CivicIntelligenceMap() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [layers, setLayers] = useState({ individual: true, heatmap: true, clusters: true, breaches: true, fleet: true });
+  const [layers, setLayers] = useState({
+  individual: true,
+  heatmap: true,
+  clusters: true,
+  breaches: true,
+  fleet: true,
+  nyc311: false,
+});
   const [toast, setToast] = useState("");
   const [filters, setFilters] = useState({ category: "All Categories", priority: "All Priorities", status: "All Statuses" });
 
   const [points, setPoints] = useState([]);
   const [clusters, setClusters] = useState([]);
   const [fleet, setFleet] = useState([]);
+  const [nyc311Points, setNyc311Points] = useState([]);
+  const [nyc311Total, setNyc311Total] = useState(0);
   const [selected, setSelected] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [, forceTick] = useState(0);
 
   const mapControls = useRef(null);
 
-  const toggle = (key) => setLayers((v) => ({ ...v, [key]: !v[key] }));
+  const toggle = (key) => {
+    setLayers((v) => {
+      const next = { ...v, [key]: !v[key] };
+
+      if (key === "nyc311") {
+        notify(
+          next.nyc311
+            ? `NYC 311 reference layer enabled — ${nyc311Total.toLocaleString()} records`
+            : "NYC 311 reference layer hidden"
+        );
+      }
+
+      return next;
+    });
+  };
   const notify = (message) => {
     setToast(message);
     window.clearTimeout(window.__civicMapToast);
@@ -64,14 +87,56 @@ export default function CivicIntelligenceMap() {
         mapService.fleet(),
         mapService.complaints(queryParams),
       ]);
-      if (c.status === "fulfilled") setClusters(c.value.clusters || []);
-      if (f.status === "fulfilled") setFleet(f.value.fleet || []);
-      if (res.status === "fulfilled") setPoints(res.value.points || []);
-      else setPoints([]);
+
+      if (c.status === "fulfilled") {
+        setClusters(c.value.clusters || []);
+      }
+
+      if (f.status === "fulfilled") {
+        setFleet(f.value.fleet || []);
+      }
+
+      if (res.status === "fulfilled") {
+        setPoints(res.value.points || []);
+      } else {
+        setPoints([]);
+      }
+
       setLastUpdated(new Date());
     },
     [queryParams]
   );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadNyc311 = async () => {
+      try {
+        const response = await mapService.nyc311({
+          limit: 1000,
+          offset: 0,
+        });
+
+        if (!active) return;
+
+        setNyc311Points(response.points || []);
+        setNyc311Total(response.pagination?.total || 0);
+      } catch (error) {
+        console.error("Failed to load NYC 311 reference data:", error);
+
+        if (active) {
+          setNyc311Points([]);
+          setNyc311Total(0);
+        }
+      }
+    };
+
+    loadNyc311();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Fetch on mount / filter change, then keep polling for live updates.
   // The initial fetch is deferred a tick so state updates land outside the
@@ -106,8 +171,15 @@ export default function CivicIntelligenceMap() {
       ["clusters", "Issue Clusters", `${clusters.length} zones`, "tertiary"],
       ["breaches", "Critical", `${criticalCount} alert`, "error"],
       ["fleet", "Fleet Telemetry", `${fleet.length} crews`, "fleet"],
+      ["nyc311", "NYC 311 Reference Data", `${nyc311Total} records`, "nyc311"],
     ],
-    [points.length, clusters.length, criticalCount, fleet.length]
+    [
+      points.length,
+      clusters.length,
+      criticalCount,
+      fleet.length,
+      nyc311Total,
+    ]
   );
 
   const handleLogout = () => {
@@ -150,6 +222,7 @@ export default function CivicIntelligenceMap() {
               points={points}
               clusters={clusters}
               fleet={fleet}
+              nyc311Points={nyc311Points}
               layers={layers}
               onSelect={setSelected}
             />

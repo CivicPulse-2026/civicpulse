@@ -1,7 +1,7 @@
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.database import get_database
 from app.core.security import require_roles
@@ -226,14 +226,18 @@ async def import_nyc_311_data(
 
 @router.get("/nyc-311")
 async def map_nyc_311(
-    category: str | None = None,
-    status: str | None = None,
-    borough: str | None = None,
+    category: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    borough: str | None = Query(default=None),
+    limit: int = Query(default=1000, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
     db=Depends(get_database),
     _=Depends(staff),
 ):
     """
-    Return NYC 311 records for the Civic Intelligence Map.
+    Return paginated NYC 311 records for the Civic Intelligence Map.
+
+    NYC 311 data is kept separate from live CivicPulse complaints.
     """
 
     query: dict = {}
@@ -247,24 +251,32 @@ async def map_nyc_311(
     if borough:
         query["location.borough"] = borough
 
-    points = []
+    total = await db.demo_service_requests.count_documents(query)
 
-    cursor = db.demo_service_requests.find(
-        query,
-        {
-            "_id": 1,
-            "source_id": 1,
-            "category": 1,
-            "subcategory": 1,
-            "description": 1,
-            "status": 1,
-            "agency": 1,
-            "agency_name": 1,
-            "location": 1,
-            "created_at": 1,
-            "closed_at": 1,
-        },
+    cursor = (
+        db.demo_service_requests
+        .find(
+            query,
+            {
+                "_id": 1,
+                "source_id": 1,
+                "category": 1,
+                "subcategory": 1,
+                "description": 1,
+                "status": 1,
+                "agency": 1,
+                "agency_name": 1,
+                "location": 1,
+                "created_at": 1,
+                "closed_at": 1,
+            },
+        )
+        .sort("created_at", -1)
+        .skip(offset)
+        .limit(limit)
     )
+
+    points = []
 
     async for c in cursor:
         loc = c.get("location") or {}
@@ -296,5 +308,11 @@ async def map_nyc_311(
     return {
         "source": "NYC_311",
         "points": points,
-        "total": len(points),
+        "pagination": {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "returned": len(points),
+            "has_more": offset + len(points) < total,
+        },
     }
