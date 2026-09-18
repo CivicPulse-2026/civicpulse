@@ -76,22 +76,6 @@ huggingface/
 **/huggingface/
 
 # ---------------------------------------------------------
-# Data
-# ---------------------------------------------------------
-# Ignore local/generated datasets
-data/raw/
-data/processed/
-
-# Keep the directory structure
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-
-# Local databases
-*.db
-*.sqlite
-*.sqlite3
-
-# ---------------------------------------------------------
 # MongoDB / Local services
 # ---------------------------------------------------------
 mongodb-data/
