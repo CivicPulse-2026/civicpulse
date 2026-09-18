@@ -59,9 +59,13 @@ htmlcov/
 # ---------------------------------------------------------
 # AI / ML
 # ---------------------------------------------------------
-# Local model files can be very large
-models/
-**/models/
+# Trained model artifacts
+*.pkl
+*.joblib
+*.onnx
+*.pt
+*.pth
+*.safetensors
 
 # Model caches
 .cache/
