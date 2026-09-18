@@ -10,7 +10,10 @@ from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import get_database
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/token",
+    auto_error=False,
+)
 
 
 def hash_password(password: str) -> str:

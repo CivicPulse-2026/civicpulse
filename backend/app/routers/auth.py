@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_database
 from app.core.security import (
@@ -55,6 +56,41 @@ async def login(payload: LoginRequest, db=Depends(get_database)):
     token = create_access_token(str(user["_id"]), user["role"], user["name"])
     return AuthResponse(token=token, user=_user_out(user))
 
+
+@router.post("/token")
+async def token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db=Depends(get_database),
+):
+    """
+    OAuth2-compatible login endpoint used by Swagger UI.
+
+    The regular /login endpoint remains JSON-based for the frontend.
+    """
+
+    user = await db.users.find_one(
+        {"email": form_data.username}
+    )
+
+    if not user or not verify_password(
+        form_data.password,
+        user["password"],
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
+
+    access_token = create_access_token(
+        str(user["_id"]),
+        user["role"],
+        user["name"],
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 @router.get("/me", response_model=dict)
 async def me(user=Depends(get_current_user)):
