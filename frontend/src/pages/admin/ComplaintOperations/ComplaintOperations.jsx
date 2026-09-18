@@ -350,8 +350,17 @@ export default function ComplaintOperations() {
 
                 <Card icon="psychology" iconClass="blue" title="AI Classification Engine" badge="Rule + LLM Hybrid" badgeClass="dark">
                   <div className="cp-ops-ai-grid">
-                    <Meta label="Inferred Category" value={complaint.category} sub="classified" verified />
-                    <Meta label="Detected Landmark" value={loc.address || "—"} />
+                    <Meta
+                      label="Inferred Category"
+                      value={complaint.ai_analysis?.category || complaint.category}
+                      sub="AI classification"
+                      verified
+                    />
+
+                    <Meta
+                      label="Detected Landmark"
+                      value={complaint.ai_analysis?.location || loc.address || "—"}
+                    />
                     <Meta label="Priority Band" value={complaint.priority} danger={complaint.priority === "CRITICAL" || complaint.priority === "HIGH"} />
                     <Meta label="Similar Reports" value={`${complaint.similar_count ?? 0} nearby`} dangerDot={!!complaint.similar_count} />
                   </div>
